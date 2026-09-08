@@ -58,7 +58,7 @@ def connect_db():
     return connection
 
 
-def get_repositories():
+def get_repositories(days):
     with connect_db() as connection:
         rows = connection.execute(
             """
@@ -66,10 +66,12 @@ def get_repositories():
             FROM repository_names AS n
             LEFT JOIN daily_traffic AS t
                 ON t.repository_id = n.repository_id
+               AND t.traffic_date >= date('now', ?)
             WHERE n.valid_to IS NULL
             GROUP BY n.repository_id, n.repository_name
             ORDER BY COALESCE(SUM(t.views), 0) DESC, n.repository_name
-            """
+            """,
+            (f"-{days - 1} days",),
         ).fetchall()
 
     return [dict(row) for row in rows]
@@ -208,8 +210,10 @@ INDEX_HTML = """<!doctype html>
     const referrerMessage = document.getElementById('referrerMessage');
     let chart = null;
 
-    async function loadRepositories() {
-      const response = await fetch('/api/repositories');
+    async function loadRepositories(preserveSelection = false) {
+      const selectedRepository = preserveSelection ? repositorySelect.value : null;
+      const days = daysSelect.value;
+      const response = await fetch(`/api/repositories?days=${days}`);
       const repositories = await response.json();
 
       repositorySelect.innerHTML = '';
@@ -218,6 +222,11 @@ INDEX_HTML = """<!doctype html>
         option.value = repository.repository_id;
         option.textContent = repository.repository_name;
         repositorySelect.appendChild(option);
+      }
+
+      if (selectedRepository && repositories.some(
+          repository => String(repository.repository_id) === selectedRepository)) {
+        repositorySelect.value = selectedRepository;
       }
 
       if (repositories.length > 0) {
@@ -294,7 +303,7 @@ INDEX_HTML = """<!doctype html>
     }
 
     repositorySelect.addEventListener('change', refresh);
-    daysSelect.addEventListener('change', loadTraffic);
+    daysSelect.addEventListener('change', () => loadRepositories(true));
 
     loadRepositories();
   </script>
@@ -335,11 +344,15 @@ class RequestHandler(BaseHTTPRequestHandler):
                 self.send_bytes(data, "text/javascript; charset=utf-8")
                 return
 
-            if parsed.path == "/api/repositories":
-                self.send_json(get_repositories())
-                return
-
             query = parse_qs(parsed.query)
+
+            if parsed.path == "/api/repositories":
+                days = int(query.get("days", ["14"])[0])
+                if days < 1:
+                    raise ValueError("days must be at least 1")
+
+                self.send_json(get_repositories(days))
+                return
 
             if parsed.path == "/api/traffic":
                 repository_id = int(query["repository_id"][0])
