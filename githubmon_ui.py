@@ -62,13 +62,13 @@ def get_repositories(days):
     with connect_db() as connection:
         rows = connection.execute(
             """
-            SELECT n.repository_id, n.repository_name
+            SELECT n.repository_id, n.owner_login, n.repository_name
             FROM repository_names AS n
             LEFT JOIN daily_traffic AS t
                 ON t.repository_id = n.repository_id
                AND t.traffic_date >= date('now', ?)
             WHERE n.valid_to IS NULL
-            GROUP BY n.repository_id, n.repository_name
+            GROUP BY n.repository_id, n.owner_login, n.repository_name
             ORDER BY COALESCE(SUM(t.views), 0) DESC, n.repository_name
             """,
             (f"-{days - 1} days",),
@@ -165,7 +165,7 @@ INDEX_HTML = """<!doctype html>
 </head>
 <body>
 
-  <h1>GitHub Traffic</h1>
+  <h1 id="pageTitle">GitHub Traffic</h1>
 
   <div class="controls">
     <label>
@@ -203,6 +203,7 @@ INDEX_HTML = """<!doctype html>
   </table>
 
   <script>
+    const pageTitle = document.getElementById('pageTitle');
     const repositorySelect = document.getElementById('repository');
     const daysSelect = document.getElementById('days');
     const referrerTable = document.getElementById('referrerTable');
@@ -222,6 +223,10 @@ INDEX_HTML = """<!doctype html>
         option.value = repository.repository_id;
         option.textContent = repository.repository_name;
         repositorySelect.appendChild(option);
+      }
+
+      if (repositories.length > 0) {
+        pageTitle.textContent = `GitHub Traffic — ${repositories[0].owner_login}`;
       }
 
       if (selectedRepository && repositories.some(
