@@ -64,7 +64,7 @@ CREATE TABLE daily_traffic (
 CREATE INDEX idx_daily_traffic_date
     ON daily_traffic(traffic_date);
 
-CREATE TABLE referral_traffic (
+CREATE TABLE IF NOT EXISTS referral_traffic (
     repository_id  INTEGER NOT NULL,
     collected_date TEXT NOT NULL,
     referrer       TEXT NOT NULL,
@@ -78,7 +78,7 @@ CREATE TABLE referral_traffic (
         ON DELETE CASCADE
 );
 
-CREATE INDEX idx_referral_traffic_date
+CREATE INDEX IF NOT EXISTS idx_referral_traffic_date
     ON referral_traffic(collected_date);
 ```
 
@@ -125,7 +125,7 @@ The composite primary key `(repository_id, collected_date, referrer)` allows one
 
 `views` is the number of visits attributed to the referrer during GitHub's trailing 14-day window, and `uniques` is GitHub's unique count for that referrer over the same window.
 
-Existing v0.1.0 databases can be upgraded using `migrations/0.1.1_referral_traffic.sql`.
+The table is created with `CREATE TABLE IF NOT EXISTS`, so the schema extension can be applied directly to an existing database without a separate migration path.
 
 ## Example upsert
 
