@@ -1,6 +1,6 @@
 # GitHubMonitor Setup
 
-This document describes the initial Windows setup for GitHubMonitor.
+This document describes the Windows setup for GitHubMonitor.
 
 ## 1. Python
 
@@ -50,7 +50,7 @@ Create the directory if it does not already exist:
 mkdir "%LOCALAPPDATA%\GitHubMonitor"
 ```
 
-The application shall determine this location at runtime from the `LOCALAPPDATA` environment variable rather than hard-coding a user profile path.
+The application determines this location at runtime from the `LOCALAPPDATA` environment variable rather than hard-coding a user profile path.
 
 An explicit database path may be supplied through the environment variable:
 
@@ -60,11 +60,33 @@ GITHUBMONITOR_DB
 
 When set, `GITHUBMONITOR_DB` overrides the platform default.
 
+The `--db` command-line option overrides both the environment variable and the platform default. This is useful for local testing:
+
+```cmd
+python githubmon.py --db githubtraffic.db show
+```
+
 The live database should not be stored in or committed to the GitHubMonitor source repository.
 
-## 4. Windows scheduled task
+## 4. Initialize the database
 
-GitHubMonitor is intended to run once per day using Windows Task Scheduler. It does not require a continuously running Windows service.
+Run:
+
+```bash
+./install_db.sh
+```
+
+To initialize an alternate database for testing:
+
+```bash
+./install_db.sh -d ./githubtraffic.db
+```
+
+The installer expects the target database not to exist already. It runs `ddl.sql` to create the schema.
+
+## 5. Windows scheduled task
+
+GitHubMonitor runs once per day using Windows Task Scheduler. It does not require a continuously running Windows service.
 
 Create the task using **Task Scheduler -> Create Task** rather than Create Basic Task.
 
@@ -90,19 +112,31 @@ GitHubMonitor does not normally require **Run with highest privileges**.
 
 Create a daily trigger. The exact collection time is not critical because each collection run refreshes the recent traffic window returned by GitHub rather than collecting only a single day's values.
 
-The task may initially be disabled until the collector script has been installed and tested.
-
 ### Action
 
 Configure the action as **Start a program**.
 
-The Program/script field should contain the full path to native Windows Python, for example:
+Program/script:
 
 ```text
 %LOCALAPPDATA%\Python\bin\python.exe
 ```
 
-The arguments and working directory will be documented once the GitHubMonitor command-line interface is implemented.
+Use the actual full path to `python.exe` when configuring Task Scheduler.
+
+Add arguments:
+
+```text
+<path-to-GitHubMonitor>\githubmon.py collect
+```
+
+If the project path contains spaces, quote the script path in the arguments field.
+
+Start in:
+
+```text
+<path-to-GitHubMonitor>
+```
 
 Do not use Cygwin `/usr/bin/python3` for the scheduled Windows task.
 
@@ -132,7 +166,7 @@ This prevents overlapping collectors from accessing the same SQLite database unn
 
 If appropriate for the machine, configure Task Scheduler to wake the computer for the task.
 
-## 5. Unattended execution
+## 6. Unattended execution
 
 The scheduled task runs under the user's Windows account even when that user is not logged in. GitHubMonitor must therefore be fully non-interactive during scheduled collection.
 
@@ -140,27 +174,28 @@ In particular:
 
 - GitHub authentication must not require an interactive prompt.
 - The database directory must be writable by the scheduled-task user.
-- Collection errors must be reported through logging and process exit status rather than GUI dialogs.
+- Collection errors are reported through process exit status and console output.
 - A failed collection must not damage previously collected traffic data.
 
-## 6. GitHub authentication
+See [GITHUB_SETUP.md](GITHUB_SETUP.md) for creation of a dedicated GitHub access token and configuration of `GITHUB_TOKEN`.
 
-GitHubMonitor requires credentials with sufficient permission to retrieve repository traffic statistics for the repositories being monitored.
+## 7. Test the deployment
 
-The final credential-storage mechanism will be documented separately before unattended collection is enabled.
+Before relying on the daily trigger:
 
-Credentials must not be committed to the GitHubMonitor repository or stored in `githubtraffic.db`.
+1. Run the collector manually and verify the database contents.
+2. Use Task Scheduler's **Run** command or:
 
-## 7. Enabling the task
+   ```cmd
+   schtasks /run /tn "\GitHubMonitor"
+   ```
 
-Leave the scheduled task disabled while the collector is under development.
+3. Inspect the result with:
 
-Before enabling it:
+   ```cmd
+   schtasks /query /tn "\GitHubMonitor" /v /fo LIST
+   ```
 
-1. Install the completed GitHubMonitor code locally.
-2. Configure unattended GitHub authentication.
-3. Run the collector manually and verify the database contents.
-4. Configure the final Task Scheduler action and working directory.
-5. Use Task Scheduler's **Run** command to test the task manually.
-6. Confirm a successful exit and updated traffic data.
-7. Enable the daily trigger.
+4. Confirm that `Last Result` is `0` and that the production database has been updated.
+
+The deployed v0.1.0 configuration has been verified to run successfully under the user's Windows account while the user is logged out.
