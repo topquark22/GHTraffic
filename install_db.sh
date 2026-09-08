@@ -2,6 +2,39 @@
 
 set -euo pipefail
 
+usage() {
+  echo "Usage: $0 [-d database]"
+}
+
+db_override=""
+while getopts ":d:h" opt; do
+  case "$opt" in
+    d)
+      db_override="$OPTARG"
+      ;;
+    h)
+      usage
+      exit 0
+      ;;
+    :)
+      echo "Error: -$OPTARG requires an argument" >&2
+      usage >&2
+      exit 1
+      ;;
+    \?)
+      echo "Error: unknown option -$OPTARG" >&2
+      usage >&2
+      exit 1
+      ;;
+  esac
+done
+
+shift $((OPTIND - 1))
+if [[ $# -ne 0 ]]; then
+  usage >&2
+  exit 1
+fi
+
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ddl_file="$script_dir/ddl.sql"
 
@@ -12,7 +45,9 @@ fi
 
 platform="$(uname -s)"
 
-if [[ -n "${GITHUBMONITOR_DB:-}" ]]; then
+if [[ -n "$db_override" ]]; then
+  db_file="$db_override"
+elif [[ -n "${GITHUBMONITOR_DB:-}" ]]; then
   db_file="$GITHUBMONITOR_DB"
 elif [[ "$platform" == CYGWIN* || "$platform" == MINGW* || "$platform" == MSYS* ]]; then
   if [[ -z "${LOCALAPPDATA:-}" ]]; then
