@@ -21,7 +21,7 @@ where python
 For the current development machine, the native interpreter is:
 
 ```text
-C:\Users\gtf\AppData\Local\Python\bin\python.exe
+%LOCALAPPDATA%\Python\bin\python.exe
 ```
 
 ## 2. SQLite
@@ -42,12 +42,6 @@ On Windows, its default location is:
 
 ```text
 %LOCALAPPDATA%\GitHubMonitor\githubtraffic.db
-```
-
-For example:
-
-```text
-C:\Users\gtf\AppData\Local\GitHubMonitor\githubtraffic.db
 ```
 
 Create the directory if it does not already exist:
