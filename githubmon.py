@@ -405,6 +405,63 @@ def show(connection, days):
     return 0
 
 
+def show_referrers(connection):
+    rows = connection.execute(
+        """
+        SELECT
+            n.repository_name,
+            r.collected_date,
+            r.referrer,
+            r.views,
+            r.uniques
+        FROM referral_traffic AS r
+        JOIN repository_names AS n
+            ON n.repository_id = r.repository_id
+           AND n.valid_to IS NULL
+        JOIN (
+            SELECT repository_id, MAX(collected_date) AS collected_date
+            FROM referral_traffic
+            GROUP BY repository_id
+        ) AS latest
+            ON latest.repository_id = r.repository_id
+           AND latest.collected_date = r.collected_date
+        ORDER BY n.repository_name, r.views DESC, r.uniques DESC, r.referrer
+        """
+    ).fetchall()
+
+    if not rows:
+        print("No referrer data.")
+        return 0
+
+    repository_width = max(len("Repository"), *(len(row[0]) for row in rows))
+    referrer_width = max(len("Referrer"), *(len(row[2]) for row in rows))
+
+    print("Latest referral traffic snapshots")
+    print()
+    print(
+        f"{'Repository':<{repository_width}}  "
+        f"{'Date':<10}  "
+        f"{'Referrer':<{referrer_width}}  "
+        f"{'Views':>7}  {'Uniques':>7}"
+    )
+    print(
+        f"{'-' * repository_width}  "
+        f"{'-' * 10}  "
+        f"{'-' * referrer_width}  "
+        f"{'-' * 7}  {'-' * 7}"
+    )
+
+    for repository, collected_date, referrer, views, uniques in rows:
+        print(
+            f"{repository:<{repository_width}}  "
+            f"{collected_date:<10}  "
+            f"{referrer:<{referrer_width}}  "
+            f"{views:>7}  {uniques:>7}"
+        )
+
+    return 0
+
+
 def positive_int(value):
     try:
         number = int(value)
@@ -429,6 +486,7 @@ def parse_args():
 
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("collect", help="collect repository traffic from GitHub")
+    subparsers.add_parser("referrers", help="show latest referral traffic snapshots")
 
     show_parser = subparsers.add_parser("show", help="show repository traffic")
     show_parser.add_argument(
@@ -458,6 +516,8 @@ def main():
                 return collect(connection)
             if args.command == "show":
                 return show(connection, args.days)
+            if args.command == "referrers":
+                return show_referrers(connection)
     except (OSError, sqlite3.Error, RuntimeError) as error:
         print(f"Error: {error}", file=sys.stderr)
         return 1
