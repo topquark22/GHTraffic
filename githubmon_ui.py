@@ -7,11 +7,14 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 
 
 DB_FILENAME = "githubtraffic.db"
+STATIC_DIR = Path(__file__).resolve().parent / "static"
 
 app = FastAPI(title="GitHubMonitor")
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
 def default_db_path():
@@ -51,7 +54,7 @@ def index():
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>GitHubMonitor</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="/static/chart.umd.min.js"></script>
   <style>
     body {
       font-family: system-ui, sans-serif;
