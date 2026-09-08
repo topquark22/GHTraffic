@@ -64,7 +64,7 @@ CREATE TABLE daily_traffic (
 CREATE INDEX idx_daily_traffic_date
     ON daily_traffic(traffic_date);
 
-CREATE TABLE IF NOT EXISTS referral_traffic (
+CREATE TABLE referral_traffic (
     repository_id  INTEGER NOT NULL,
     collected_date TEXT NOT NULL,
     referrer       TEXT NOT NULL,
@@ -78,7 +78,7 @@ CREATE TABLE IF NOT EXISTS referral_traffic (
         ON DELETE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS idx_referral_traffic_date
+CREATE INDEX idx_referral_traffic_date
     ON referral_traffic(collected_date);
 ```
 
