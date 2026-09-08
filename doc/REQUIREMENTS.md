@@ -1,0 +1,142 @@
+# GitHubMonitor Requirements
+
+## 1. Purpose
+
+GitHubMonitor collects repository traffic statistics from GitHub and maintains a local historical record that is not limited by GitHub's short traffic-retention window.
+
+The initial version focuses on repository views and clones across all non-fork repositories owned by the authenticated GitHub user.
+
+## 2. Repository discovery
+
+1. The application shall determine the authenticated GitHub user through the GitHub API.
+2. The application shall retrieve the repositories owned by that user through the GitHub API.
+3. Repository discovery shall not depend on a manually maintained repository list.
+4. Forked repositories shall be excluded from monitoring.
+5. Public and private repositories shall be eligible for monitoring.
+6. Archived repositories shall remain eligible for monitoring.
+7. Newly created repositories shall be discovered automatically on subsequent runs.
+8. Repositories that are renamed shall be tracked using their stable GitHub repository ID.
+
+## 3. Repository metadata
+
+For each discovered repository, the application shall retain at least:
+
+- GitHub repository ID
+- owner login
+- repository name
+- full repository name
+- visibility or private/public status
+- archived status
+- fork status
+- default branch
+
+Repository metadata shall be refreshed during collection runs.
+
+## 4. Traffic collection
+
+For every monitored repository, the application shall retrieve GitHub traffic data for:
+
+- views
+- unique visitors
+- clones
+- unique cloners
+
+The application shall use GitHub's daily traffic breakdown rather than relying only on rolling aggregate totals.
+
+The application shall refresh the complete traffic window returned by GitHub on each collection run. Existing records for a repository and date shall be updated when GitHub returns revised values.
+
+Collection shall therefore be idempotent: running the collector repeatedly with the same GitHub data shall not create duplicate traffic records.
+
+## 5. Historical persistence
+
+Traffic history shall be stored in SQLite.
+
+The database shall retain historical daily traffic after the corresponding data is no longer available from GitHub.
+
+Each repository/date pair shall have at most one traffic record.
+
+Each traffic record shall retain the time at which it was most recently collected.
+
+Dates shall be stored in ISO 8601 form suitable for chronological ordering and SQLite date operations.
+
+## 6. Initial data model
+
+The initial database shall contain a repository table and a daily traffic table.
+
+A repository record shall have a local primary key and a unique GitHub repository ID.
+
+A daily traffic record shall contain:
+
+- repository reference
+- traffic date
+- views
+- unique visitors
+- clones
+- unique cloners
+- collection timestamp
+
+The repository reference and traffic date together shall uniquely identify a daily traffic record.
+
+## 7. Reporting
+
+The application shall be able to produce a daily report covering all monitored repositories.
+
+The report shall include, for each repository:
+
+- views
+- unique visitors
+- clones
+- unique cloners
+
+Repositories with no activity may be omitted from the default daily report.
+
+The application should support aggregate reporting over longer periods, including at least seven-day and thirty-day totals for views and clones.
+
+Daily unique visitor and unique cloner counts shall not be represented as true multi-day unique-user totals when aggregated across dates, because GitHub does not provide identity-level data needed to deduplicate users across days.
+
+## 8. Scheduling
+
+The collector shall be suitable for unattended execution once per day.
+
+Scheduling shall be external to the core collector so the program can be run manually, by cron, by systemd timers, or by another scheduler.
+
+A failed collection run shall not corrupt or discard previously collected traffic history.
+
+## 9. Authentication
+
+The application shall authenticate to GitHub using credentials supported by the GitHub API.
+
+Credentials shall not be stored in the SQLite database or committed to the source repository.
+
+The authenticated credentials must have sufficient permission to retrieve traffic data for every repository to be monitored.
+
+## 10. Error handling
+
+Failure to collect traffic for one repository shall not prevent collection from continuing for other repositories.
+
+Collection failures shall identify the affected repository and provide enough diagnostic information to determine whether the failure was caused by authentication, permissions, API limits, or another error.
+
+The application shall return a non-zero exit status when a collection run contains failures that require operator attention.
+
+## 11. Initial scope exclusions
+
+The first version does not require:
+
+- monitoring repositories owned by other users or organizations
+- monitoring forked repositories
+- a graphical or web user interface
+- GitHub Actions as the required scheduler
+- storage of individual visitor identities
+- reconstruction of historical traffic older than the data available when GitHubMonitor is first run
+- top referrer collection
+- popular-path collection
+
+Top referrers and popular paths may be added in a later version without changing the core daily traffic model.
+
+## 12. Design goals
+
+The implementation should remain small, understandable, and easy to operate.
+
+The collector should prefer GitHub's documented API over scraping GitHub web pages.
+
+The SQLite database should remain portable and directly inspectable with standard SQLite tools.
