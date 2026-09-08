@@ -3,6 +3,7 @@
 import json
 import os
 import sqlite3
+import subprocess
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -26,6 +27,19 @@ def default_db_path():
             raise RuntimeError("LOCALAPPDATA is not set")
 
         return Path(local_app_data) / "GitHubMonitor" / DB_FILENAME
+
+    if sys.platform == "cygwin":
+        local_app_data = os.environ.get("LOCALAPPDATA")
+        if not local_app_data:
+            raise RuntimeError("LOCALAPPDATA is not set")
+
+        result = subprocess.run(
+            ["cygpath", "-u", local_app_data],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        return Path(result.stdout.strip()) / "GitHubMonitor" / DB_FILENAME
 
     data_home = os.environ.get("XDG_DATA_HOME")
     if data_home:
