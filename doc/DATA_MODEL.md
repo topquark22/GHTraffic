@@ -6,7 +6,7 @@ GitHubMonitor uses the stable numeric GitHub repository ID as the canonical iden
 
 Traffic records therefore reference `repository_id`, never a repository name.
 
-The authoritative schema for v0.1.0 is defined in `ddl.sql`.
+The authoritative schema is defined in `ddl.sql`.
 
 ## SQLite DDL
 
@@ -63,6 +63,23 @@ CREATE TABLE daily_traffic (
 
 CREATE INDEX idx_daily_traffic_date
     ON daily_traffic(traffic_date);
+
+CREATE TABLE referral_traffic (
+    repository_id  INTEGER NOT NULL,
+    collected_date TEXT NOT NULL,
+    referrer       TEXT NOT NULL,
+    views          INTEGER NOT NULL DEFAULT 0,
+    uniques        INTEGER NOT NULL DEFAULT 0,
+
+    PRIMARY KEY (repository_id, collected_date, referrer),
+
+    FOREIGN KEY (repository_id)
+        REFERENCES repositories(repository_id)
+        ON DELETE CASCADE
+);
+
+CREATE INDEX idx_referral_traffic_date
+    ON referral_traffic(collected_date);
 ```
 
 ## Table semantics
@@ -80,7 +97,7 @@ The table stores repository attributes that are not part of the repository name 
 - GitHub's repository creation timestamp (`created_at`)
 - GitHub's repository update timestamp (`updated_at`)
 
-Forked repositories are excluded from collection before they are inserted by the v0.1.0 collector.
+Forked repositories are excluded from collection before they are inserted by the collector.
 
 ### `repository_names`
 
@@ -97,6 +114,18 @@ This table stores one row per repository per GitHub traffic date.
 The composite primary key `(repository_id, traffic_date)` makes collection idempotent and supports upserting the full traffic window returned by GitHub on every collection run.
 
 `collected_at` records when the row was most recently refreshed from GitHub.
+
+### `referral_traffic`
+
+This table stores snapshots of GitHub's top referrers for each repository.
+
+GitHub returns referrer data as a rolling 14-day aggregate rather than as daily observations. Each collection therefore stores the current snapshot using `collected_date`.
+
+The composite primary key `(repository_id, collected_date, referrer)` allows one row per referrer in each daily snapshot.
+
+`views` is the number of visits attributed to the referrer during GitHub's trailing 14-day window, and `uniques` is GitHub's unique count for that referrer over the same window.
+
+Existing v0.1.0 databases can be upgraded using `migrations/0.1.1_referral_traffic.sql`.
 
 ## Example upsert
 
@@ -145,6 +174,8 @@ The `show [days]` command aggregates `daily_traffic` over the requested date win
 By default, `show` reports the most recent 14 days. Repositories with no views and no clones during the selected period are omitted.
 
 Multi-day sums of `unique_visitors` or `unique_cloners` are not true multi-day unique counts, because GitHub does not expose identities that would allow the same visitor or cloner to be deduplicated across multiple days.
+
+Referral data is inherently a rolling 14-day snapshot and should be presented as such rather than aggregated as though it represented independent daily counts.
 
 ## Notes
 
