@@ -1,20 +1,18 @@
 #!/usr/bin/env python3
 
+import json
 import os
 import sqlite3
 import sys
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import HTMLResponse
-from fastapi.staticfiles import StaticFiles
+from urllib.parse import parse_qs, urlparse
 
 
 DB_FILENAME = "githubtraffic.db"
 STATIC_DIR = Path(__file__).resolve().parent / "static"
-
-app = FastAPI(title="GitHubMonitor")
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+HOST = "127.0.0.1"
+PORT = 8501
 
 
 def default_db_path():
@@ -46,9 +44,57 @@ def connect_db():
     return connection
 
 
-@app.get("/", response_class=HTMLResponse)
-def index():
-    return """<!doctype html>
+def get_repositories():
+    with connect_db() as connection:
+        rows = connection.execute(
+            """
+            SELECT repository_id, repository_name
+            FROM repository_names
+            WHERE valid_to IS NULL
+            ORDER BY repository_name
+            """
+        ).fetchall()
+
+    return [dict(row) for row in rows]
+
+
+def get_traffic(repository_id, days):
+    with connect_db() as connection:
+        rows = connection.execute(
+            """
+            SELECT traffic_date, views, clones
+            FROM daily_traffic
+            WHERE repository_id = ?
+              AND traffic_date >= date('now', ?)
+            ORDER BY traffic_date
+            """,
+            (repository_id, f"-{days - 1} days"),
+        ).fetchall()
+
+    return [dict(row) for row in rows]
+
+
+def get_referrers(repository_id):
+    with connect_db() as connection:
+        rows = connection.execute(
+            """
+            SELECT collected_date, referrer, views, uniques
+            FROM referral_traffic
+            WHERE repository_id = ?
+              AND collected_date = (
+                  SELECT MAX(collected_date)
+                  FROM referral_traffic
+                  WHERE repository_id = ?
+              )
+            ORDER BY views DESC, uniques DESC, referrer
+            """,
+            (repository_id, repository_id),
+        ).fetchall()
+
+    return [dict(row) for row in rows]
+
+
+INDEX_HTML = """<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -239,66 +285,79 @@ def index():
 """
 
 
-@app.get("/api/repositories")
-def repositories():
+class RequestHandler(BaseHTTPRequestHandler):
+    def send_bytes(self, data, content_type, status=200):
+        self.send_response(status)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+    def send_json(self, value, status=200):
+        data = json.dumps(value).encode("utf-8")
+        self.send_bytes(data, "application/json; charset=utf-8", status)
+
+    def send_error_json(self, message, status=500):
+        self.send_json({"error": message}, status)
+
+    def do_GET(self):
+        parsed = urlparse(self.path)
+
+        try:
+            if parsed.path == "/":
+                self.send_bytes(
+                    INDEX_HTML.encode("utf-8"),
+                    "text/html; charset=utf-8",
+                )
+                return
+
+            if parsed.path == "/static/chart.umd.min.js":
+                chart_path = STATIC_DIR / "chart.umd.min.js"
+                data = chart_path.read_bytes()
+                self.send_bytes(data, "text/javascript; charset=utf-8")
+                return
+
+            if parsed.path == "/api/repositories":
+                self.send_json(get_repositories())
+                return
+
+            query = parse_qs(parsed.query)
+
+            if parsed.path == "/api/traffic":
+                repository_id = int(query["repository_id"][0])
+                days = int(query.get("days", ["14"])[0])
+                if days < 1:
+                    raise ValueError("days must be at least 1")
+
+                self.send_json(get_traffic(repository_id, days))
+                return
+
+            if parsed.path == "/api/referrers":
+                repository_id = int(query["repository_id"][0])
+                self.send_json(get_referrers(repository_id))
+                return
+
+            self.send_error_json("Not found", 404)
+        except (KeyError, ValueError):
+            self.send_error_json("Invalid request", 400)
+        except (OSError, sqlite3.Error, RuntimeError) as error:
+            self.send_error_json(str(error), 500)
+
+    def log_message(self, format, *args):
+        print(f"{self.address_string()} - {format % args}")
+
+
+def main():
+    server = ThreadingHTTPServer((HOST, PORT), RequestHandler)
+    print(f"GitHubMonitor UI: http://{HOST}:{PORT}")
+
     try:
-        with connect_db() as connection:
-            rows = connection.execute(
-                """
-                SELECT repository_id, repository_name
-                FROM repository_names
-                WHERE valid_to IS NULL
-                ORDER BY repository_name
-                """
-            ).fetchall()
-
-        return [dict(row) for row in rows]
-    except (OSError, sqlite3.Error, RuntimeError) as error:
-        raise HTTPException(status_code=500, detail=str(error)) from error
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.server_close()
 
 
-@app.get("/api/traffic")
-def traffic(
-    repository_id: int,
-    days: int = Query(default=14, ge=1),
-):
-    try:
-        with connect_db() as connection:
-            rows = connection.execute(
-                """
-                SELECT traffic_date, views, clones
-                FROM daily_traffic
-                WHERE repository_id = ?
-                  AND traffic_date >= date('now', ?)
-                ORDER BY traffic_date
-                """,
-                (repository_id, f"-{days - 1} days"),
-            ).fetchall()
-
-        return [dict(row) for row in rows]
-    except (OSError, sqlite3.Error, RuntimeError) as error:
-        raise HTTPException(status_code=500, detail=str(error)) from error
-
-
-@app.get("/api/referrers")
-def referrers(repository_id: int):
-    try:
-        with connect_db() as connection:
-            rows = connection.execute(
-                """
-                SELECT collected_date, referrer, views, uniques
-                FROM referral_traffic
-                WHERE repository_id = ?
-                  AND collected_date = (
-                      SELECT MAX(collected_date)
-                      FROM referral_traffic
-                      WHERE repository_id = ?
-                  )
-                ORDER BY views DESC, uniques DESC, referrer
-                """,
-                (repository_id, repository_id),
-            ).fetchall()
-
-        return [dict(row) for row in rows]
-    except (OSError, sqlite3.Error, RuntimeError) as error:
-        raise HTTPException(status_code=500, detail=str(error)) from error
+if __name__ == "__main__":
+    main()
