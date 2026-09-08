@@ -99,7 +99,7 @@ Configure the action as **Start a program**.
 The Program/script field should contain the full path to native Windows Python, for example:
 
 ```text
-C:\Users\gtf\AppData\Local\Python\bin\python.exe
+%LOCALAPPDATA%\Python\bin\python.exe
 ```
 
 The arguments and working directory will be documented once the GitHubMonitor command-line interface is implemented.
