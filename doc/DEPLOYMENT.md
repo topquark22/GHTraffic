@@ -56,7 +56,7 @@ The collector requires `GITHUB_TOKEN` to be available in its environment. See [G
 Create a Windows Task Scheduler task named, for example:
 
 ```text
-GitHubMonitor
+GitHubMonitor Collector
 ```
 
 Configure it to run once per day under the user's account, including when the user is logged out.
