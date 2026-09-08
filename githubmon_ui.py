@@ -159,7 +159,8 @@ INDEX_HTML = """<!doctype html>
   </style>
 </head>
 <body>
-  <h1>GitHubMonitor</h1>
+
+  <h1>GitHub Traffic</h1>
 
   <div class="controls">
     <label>
