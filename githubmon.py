@@ -436,11 +436,11 @@ def show_referrers(connection):
     repository_width = max(len("Repository"), *(len(row[0]) for row in rows))
     referrer_width = max(len("Referrer"), *(len(row[2]) for row in rows))
 
-    print("Latest referral traffic snapshots")
+    print("Referrers report")
     print()
     print(
         f"{'Repository':<{repository_width}}  "
-        f"{'Date':<10}  "
+        f"{'As of':<10}  "
         f"{'Referrer':<{referrer_width}}  "
         f"{'Views':>7}  {'Uniques':>7}"
     )
