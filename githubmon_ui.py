@@ -62,10 +62,13 @@ def get_repositories():
     with connect_db() as connection:
         rows = connection.execute(
             """
-            SELECT repository_id, repository_name
-            FROM repository_names
-            WHERE valid_to IS NULL
-            ORDER BY repository_name
+            SELECT n.repository_id, n.repository_name
+            FROM repository_names AS n
+            LEFT JOIN daily_traffic AS t
+                ON t.repository_id = n.repository_id
+            WHERE n.valid_to IS NULL
+            GROUP BY n.repository_id, n.repository_name
+            ORDER BY COALESCE(SUM(t.views), 0) DESC, n.repository_name
             """
         ).fetchall()
 
