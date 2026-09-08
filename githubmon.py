@@ -18,6 +18,7 @@ REQUIRED_TABLES = {
     "repositories",
     "repository_names",
     "daily_traffic",
+    "referral_traffic",
 }
 
 
@@ -229,6 +230,16 @@ def get_traffic(repository, token):
     return traffic
 
 
+def get_referrers(repository, token):
+    owner = quote(repository["owner"]["login"], safe="")
+    name = quote(repository["name"], safe="")
+
+    return github_get(
+        f"/repos/{owner}/{name}/traffic/popular/referrers",
+        token,
+    )
+
+
 def update_traffic(connection, repository_id, traffic, collected_at):
     for traffic_date, values in traffic.items():
         connection.execute(
@@ -263,6 +274,37 @@ def update_traffic(connection, repository_id, traffic, collected_at):
         )
 
 
+def update_referrers(connection, repository_id, referrers, collected_date):
+    connection.execute(
+        """
+        DELETE FROM referral_traffic
+        WHERE repository_id = ? AND collected_date = ?
+        """,
+        (repository_id, collected_date),
+    )
+
+    for item in referrers:
+        connection.execute(
+            """
+            INSERT INTO referral_traffic (
+                repository_id,
+                collected_date,
+                referrer,
+                views,
+                uniques
+            )
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                repository_id,
+                collected_date,
+                item["referrer"],
+                item["count"],
+                item["uniques"],
+            ),
+        )
+
+
 def collect(connection):
     token = os.environ.get("GITHUB_TOKEN")
     if not token:
@@ -276,9 +318,11 @@ def collect(connection):
     for repository in repositories:
         full_name = repository["full_name"]
         collected_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        collected_date = collected_at[:10]
 
         try:
             traffic = get_traffic(repository, token)
+            referrers = get_referrers(repository, token)
 
             with connection:
                 update_repository(connection, repository, collected_at)
@@ -288,8 +332,17 @@ def collect(connection):
                     traffic,
                     collected_at,
                 )
+                update_referrers(
+                    connection,
+                    repository["id"],
+                    referrers,
+                    collected_date,
+                )
 
-            print(f"Collected {full_name}: {len(traffic)} days")
+            print(
+                f"Collected {full_name}: {len(traffic)} days, "
+                f"{len(referrers)} referrers"
+            )
         except (sqlite3.Error, RuntimeError) as error:
             failures += 1
             print(f"Error collecting {full_name}: {error}", file=sys.stderr)
