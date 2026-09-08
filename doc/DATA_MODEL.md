@@ -6,6 +6,8 @@ GitHubMonitor uses the stable numeric GitHub repository ID as the canonical iden
 
 Traffic records therefore reference `repository_id`, never a repository name.
 
+The authoritative schema for v0.1.0 is defined in `ddl.sql`.
+
 ## SQLite DDL
 
 ```sql
@@ -13,17 +15,17 @@ PRAGMA foreign_keys = ON;
 
 CREATE TABLE repositories (
     repository_id   INTEGER PRIMARY KEY,
-    is_private      INTEGER NOT NULL DEFAULT 0 CHECK (is_private IN (0, 1)),
-    is_archived     INTEGER NOT NULL DEFAULT 0 CHECK (is_archived IN (0, 1)),
-    is_fork         INTEGER NOT NULL DEFAULT 0 CHECK (is_fork IN (0, 1)),
+    is_private      INTEGER NOT NULL DEFAULT 0,
+    is_archived     INTEGER NOT NULL DEFAULT 0,
+    is_fork         INTEGER NOT NULL DEFAULT 0,
     default_branch  TEXT,
-    first_seen_at   TEXT NOT NULL,
-    last_seen_at    TEXT NOT NULL
+    created_at      TEXT,
+    updated_at      TEXT
 );
 
 CREATE TABLE repository_names (
     repository_id   INTEGER NOT NULL,
-    owner_name      TEXT NOT NULL,
+    owner_login     TEXT NOT NULL,
     repository_name TEXT NOT NULL,
     full_name       TEXT NOT NULL,
     valid_from      TEXT NOT NULL,
@@ -33,10 +35,7 @@ CREATE TABLE repository_names (
 
     FOREIGN KEY (repository_id)
         REFERENCES repositories(repository_id)
-        ON DELETE CASCADE,
-
-    CHECK (full_name = owner_name || '/' || repository_name),
-    CHECK (valid_to IS NULL OR valid_to > valid_from)
+        ON DELETE CASCADE
 );
 
 CREATE UNIQUE INDEX idx_repository_names_current
@@ -49,10 +48,10 @@ CREATE INDEX idx_repository_names_full_name
 CREATE TABLE daily_traffic (
     repository_id   INTEGER NOT NULL,
     traffic_date    TEXT NOT NULL,
-    views           INTEGER NOT NULL DEFAULT 0 CHECK (views >= 0),
-    unique_visitors INTEGER NOT NULL DEFAULT 0 CHECK (unique_visitors >= 0),
-    clones          INTEGER NOT NULL DEFAULT 0 CHECK (clones >= 0),
-    unique_cloners  INTEGER NOT NULL DEFAULT 0 CHECK (unique_cloners >= 0),
+    views           INTEGER NOT NULL DEFAULT 0,
+    unique_visitors INTEGER NOT NULL DEFAULT 0,
+    clones          INTEGER NOT NULL DEFAULT 0,
+    unique_cloners  INTEGER NOT NULL DEFAULT 0,
     collected_at    TEXT NOT NULL,
 
     PRIMARY KEY (repository_id, traffic_date),
@@ -78,10 +77,10 @@ The table stores repository attributes that are not part of the repository name 
 - whether it is archived
 - whether it is a fork
 - the default branch
-- the first time GitHubMonitor observed the repository
-- the most recent time GitHubMonitor observed the repository
+- GitHub's repository creation timestamp (`created_at`)
+- GitHub's repository update timestamp (`updated_at`)
 
-Although forked repositories are retained in the model if discovered, they are excluded from traffic collection.
+Forked repositories are excluded from collection before they are inserted by the v0.1.0 collector.
 
 ### `repository_names`
 
@@ -89,7 +88,7 @@ This table records repository naming history.
 
 A repository may have only one row whose `valid_to` is `NULL`; that row represents the current name. When a rename or ownership change is detected, GitHubMonitor closes the current row by setting `valid_to` and inserts a new row with the same `repository_id`.
 
-`full_name` is retained explicitly for convenient querying, while the check constraint ensures that it remains consistent with `owner_name` and `repository_name`.
+`owner_login`, `repository_name`, and `full_name` are retained so reports can use the current repository name while historical identity remains tied to the stable GitHub ID.
 
 ### `daily_traffic`
 
@@ -126,7 +125,7 @@ DO UPDATE SET
 ```sql
 SELECT
     r.repository_id,
-    n.owner_name,
+    n.owner_login,
     n.repository_name,
     n.full_name,
     r.is_private,
@@ -139,25 +138,14 @@ JOIN repository_names AS n
 WHERE n.valid_to IS NULL;
 ```
 
-## Daily report query
+## Reporting
 
-```sql
-SELECT
-    n.full_name,
-    t.views,
-    t.unique_visitors,
-    t.clones,
-    t.unique_cloners
-FROM daily_traffic AS t
-JOIN repository_names AS n
-    ON n.repository_id = t.repository_id
-   AND n.valid_to IS NULL
-WHERE t.traffic_date = ?
-ORDER BY t.views DESC, t.clones DESC, n.full_name;
-```
+The `show [days]` command aggregates `daily_traffic` over the requested date window and joins to the current row in `repository_names`.
+
+By default, `show` reports the most recent 14 days. Repositories with no views and no clones during the selected period are omitted.
+
+Multi-day sums of `unique_visitors` or `unique_cloners` are not true multi-day unique counts, because GitHub does not expose identities that would allow the same visitor or cloner to be deduplicated across multiple days.
 
 ## Notes
 
 Dates and timestamps are stored as ISO 8601 text. SQLite does not provide a dedicated date/time storage class, and ISO 8601 text preserves chronological ordering while remaining compatible with SQLite date functions.
-
-Multi-day sums of `unique_visitors` or `unique_cloners` are not true multi-day unique counts, because GitHub does not expose identities that would allow the same visitor or cloner to be deduplicated across multiple days.
