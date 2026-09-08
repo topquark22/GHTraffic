@@ -305,6 +305,65 @@ def collect(connection):
     return 0
 
 
+def show(connection, days):
+    rows = connection.execute(
+        """
+        SELECT
+            n.repository_name,
+            SUM(t.views),
+            SUM(t.unique_visitors),
+            SUM(t.clones),
+            SUM(t.unique_cloners)
+        FROM daily_traffic AS t
+        JOIN repository_names AS n
+            ON n.repository_id = t.repository_id
+           AND n.valid_to IS NULL
+        WHERE t.traffic_date >= date('now', ?)
+        GROUP BY t.repository_id, n.repository_name
+        HAVING SUM(t.views) > 0 OR SUM(t.clones) > 0
+        ORDER BY SUM(t.views) DESC, SUM(t.clones) DESC, n.repository_name
+        """,
+        (f"-{days - 1} days",),
+    ).fetchall()
+
+    print(f"Traffic for the last {days} days")
+    print()
+
+    if not rows:
+        print("No traffic.")
+        return 0
+
+    name_width = max(len("Repository"), *(len(row[0]) for row in rows))
+    print(
+        f"{'Repository':<{name_width}}  "
+        f"{'Views':>7}  {'Visitors':>8}  {'Clones':>7}  {'Cloners':>7}"
+    )
+    print(
+        f"{'-' * name_width}  "
+        f"{'-' * 7}  {'-' * 8}  {'-' * 7}  {'-' * 7}"
+    )
+
+    for name, views, visitors, clones, cloners in rows:
+        print(
+            f"{name:<{name_width}}  "
+            f"{views:>7}  {visitors:>8}  {clones:>7}  {cloners:>7}"
+        )
+
+    return 0
+
+
+def positive_int(value):
+    try:
+        number = int(value)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError("days must be an integer") from error
+
+    if number < 1:
+        raise argparse.ArgumentTypeError("days must be at least 1")
+
+    return number
+
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description="Collect and report GitHub repository traffic."
@@ -317,6 +376,15 @@ def parse_args():
 
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("collect", help="collect repository traffic from GitHub")
+
+    show_parser = subparsers.add_parser("show", help="show repository traffic")
+    show_parser.add_argument(
+        "days",
+        nargs="?",
+        type=positive_int,
+        default=14,
+        help="number of days to show (default: 14)",
+    )
 
     return parser.parse_args()
 
@@ -335,6 +403,8 @@ def main():
 
             if args.command == "collect":
                 return collect(connection)
+            if args.command == "show":
+                return show(connection, args.days)
     except (OSError, sqlite3.Error, RuntimeError) as error:
         print(f"Error: {error}", file=sys.stderr)
         return 1
