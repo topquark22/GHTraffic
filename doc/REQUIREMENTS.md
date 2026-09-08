@@ -40,12 +40,15 @@ For every monitored repository, the application shall retrieve GitHub traffic da
 - unique visitors
 - clones
 - unique cloners
+- top referral sources
 
-The application shall use GitHub's daily traffic breakdown rather than relying only on rolling aggregate totals.
+The application shall use GitHub's daily traffic breakdown for views and clones rather than relying only on rolling aggregate totals.
 
-The application shall refresh the complete traffic window returned by GitHub on each collection run. Existing records for a repository and date shall be updated when GitHub returns revised values.
+The application shall refresh the complete views/clones traffic window returned by GitHub on each collection run. Existing records for a repository and date shall be updated when GitHub returns revised values.
 
 Collection shall therefore be idempotent: running the collector repeatedly with the same GitHub data shall not create duplicate traffic records.
+
+Referral traffic shall be stored as snapshots of GitHub's trailing 14-day top-referrer data. Successive referral snapshots shall not be treated as independent daily traffic counts.
 
 ## 5. Historical persistence
 
@@ -53,19 +56,22 @@ Traffic history shall be stored in SQLite.
 
 The database shall retain historical daily traffic after the corresponding data is no longer available from GitHub.
 
-Each repository/date pair shall have at most one traffic record.
+Each repository/date pair shall have at most one daily traffic record.
 
-Each traffic record shall retain the time at which it was most recently collected.
+Each daily traffic record shall retain the time at which it was most recently collected.
+
+For referral traffic, each repository/collection-date/referrer combination shall have at most one record.
 
 Dates shall be stored in ISO 8601 form suitable for chronological ordering and SQLite date operations.
 
 ## 6. Initial data model
 
-The initial database shall contain three tables:
+The database shall contain four tables:
 
 - `repositories`
 - `repository_names`
 - `daily_traffic`
+- `referral_traffic`
 
 The numeric GitHub repository ID shall be used directly as the canonical repository key. No separate local surrogate repository key is required.
 
@@ -82,6 +88,16 @@ A daily traffic record shall contain:
 - collection timestamp
 
 The repository reference and traffic date together shall uniquely identify a daily traffic record.
+
+A referral traffic record shall contain:
+
+- repository reference
+- collection date
+- referrer
+- views
+- unique visitors
+
+The repository reference, collection date, and referrer together shall uniquely identify a referral traffic record.
 
 ## 7. Reporting
 
@@ -143,10 +159,9 @@ The first version does not require:
 - GitHub Actions as the required scheduler
 - storage of individual visitor identities
 - reconstruction of historical traffic older than the data available when GitHubMonitor is first run
-- top referrer collection
 - popular-path collection
 
-Top referrers and popular paths may be added in a later version without changing the core daily traffic model.
+Popular paths may be added in a later version without changing the core daily traffic model.
 
 ## 12. Design goals
 
