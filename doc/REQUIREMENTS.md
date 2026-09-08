@@ -61,9 +61,15 @@ Dates shall be stored in ISO 8601 form suitable for chronological ordering and S
 
 ## 6. Initial data model
 
-The initial database shall contain a repository table and a daily traffic table.
+The initial database shall contain three tables:
 
-A repository record shall have a local primary key and a unique GitHub repository ID.
+- `repositories`
+- `repository_names`
+- `daily_traffic`
+
+The numeric GitHub repository ID shall be used directly as the canonical repository key. No separate local surrogate repository key is required.
+
+Repository names shall be stored separately from repository identity so that name changes can be tracked over time without changing the repository key used by traffic records.
 
 A daily traffic record shall contain:
 
@@ -79,7 +85,9 @@ The repository reference and traffic date together shall uniquely identify a dai
 
 ## 7. Reporting
 
-The application shall be able to produce a daily report covering all monitored repositories.
+The application shall provide a `show [days]` command that reports traffic from the local database.
+
+When `days` is omitted, `show` shall report the most recent 14 days.
 
 The report shall include, for each repository:
 
@@ -88,9 +96,14 @@ The report shall include, for each repository:
 - clones
 - unique cloners
 
-Repositories with no activity may be omitted from the default daily report.
+Repositories with no views and no clones during the selected period may be omitted from the default report.
 
-The application should support aggregate reporting over longer periods, including at least seven-day and thirty-day totals for views and clones.
+The application shall allow the user to request other reporting windows by supplying a positive integer number of days, for example:
+
+```text
+show 7
+show 30
+```
 
 Daily unique visitor and unique cloner counts shall not be represented as true multi-day unique-user totals when aggregated across dates, because GitHub does not provide identity-level data needed to deduplicate users across days.
 
@@ -98,13 +111,15 @@ Daily unique visitor and unique cloner counts shall not be represented as true m
 
 The collector shall be suitable for unattended execution once per day.
 
-Scheduling shall be external to the core collector so the program can be run manually, by cron, by systemd timers, or by another scheduler.
+Scheduling shall be external to the core collector so the program can be run manually or by an operating-system scheduler.
+
+On Windows, the supported v0.1.0 deployment uses Windows Task Scheduler under the user's account and may run while the user is logged out.
 
 A failed collection run shall not corrupt or discard previously collected traffic history.
 
 ## 9. Authentication
 
-The application shall authenticate to GitHub using credentials supported by the GitHub API.
+The application shall authenticate to GitHub using a dedicated access token supplied through the `GITHUB_TOKEN` environment variable.
 
 Credentials shall not be stored in the SQLite database or committed to the source repository.
 
