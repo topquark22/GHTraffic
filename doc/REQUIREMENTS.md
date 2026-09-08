@@ -1,12 +1,14 @@
 # GitHubMonitor Requirements
 
-## 1. Purpose
+## Core
+
+### 1. Purpose
 
 GitHubMonitor collects repository traffic statistics from GitHub and maintains a local historical record that is not limited by GitHub's short traffic-retention window.
 
 The initial version focuses on repository views and clones across all non-fork repositories owned by the authenticated GitHub user.
 
-## 2. Repository discovery
+### 2. Repository discovery
 
 1. The application shall determine the authenticated GitHub user through the GitHub API.
 2. The application shall retrieve the repositories owned by that user through the GitHub API.
@@ -17,7 +19,7 @@ The initial version focuses on repository views and clones across all non-fork r
 7. Newly created repositories shall be discovered automatically on subsequent runs.
 8. Repositories that are renamed shall be tracked using their stable GitHub repository ID.
 
-## 3. Repository metadata
+### 3. Repository metadata
 
 For each discovered repository, the application shall retain at least:
 
@@ -32,7 +34,7 @@ For each discovered repository, the application shall retain at least:
 
 Repository metadata shall be refreshed during collection runs.
 
-## 4. Traffic collection
+### 4. Traffic collection
 
 For every monitored repository, the application shall retrieve GitHub traffic data for:
 
@@ -48,9 +50,9 @@ The application shall refresh the complete views/clones traffic window returned 
 
 Collection shall therefore be idempotent: running the collector repeatedly with the same GitHub data shall not create duplicate traffic records.
 
-Referral traffic shall be stored as snapshots of GitHub's trailing 14-day top-referrer data. Successive referral snapshots shall not be treated as independent daily traffic counts.
+Referral traffic shall be stored as snapshots of the top-referrer data reported by GitHub. Successive referral snapshots shall not be treated as independent daily traffic counts.
 
-## 5. Historical persistence
+### 5. Historical persistence
 
 Traffic history shall be stored in SQLite.
 
@@ -64,7 +66,7 @@ For referral traffic, each repository/collection-date/referrer combination shall
 
 Dates shall be stored in ISO 8601 form suitable for chronological ordering and SQLite date operations.
 
-## 6. Initial data model
+### 6. Initial data model
 
 The database shall contain four tables:
 
@@ -99,7 +101,7 @@ A referral traffic record shall contain:
 
 The repository reference, collection date, and referrer together shall uniquely identify a referral traffic record.
 
-## 7. Reporting
+### 7. Reporting
 
 The application shall provide a `show [days]` command that reports traffic from the local database.
 
@@ -123,17 +125,19 @@ show 30
 
 Daily unique visitor and unique cloner counts shall not be represented as true multi-day unique-user totals when aggregated across dates, because GitHub does not provide identity-level data needed to deduplicate users across days.
 
-## 8. Scheduling
+The application shall provide a `referrers` command that reports the most recently collected referrer data for each repository. The collection date shall be presented as the date the values were observed ("As of"), not as the date on which the underlying traffic occurred.
+
+### 8. Scheduling
 
 The collector shall be suitable for unattended execution once per day.
 
 Scheduling shall be external to the core collector so the program can be run manually or by an operating-system scheduler.
 
-On Windows, the supported v0.1.0 deployment uses Windows Task Scheduler under the user's account and may run while the user is logged out.
+On Windows, the supported deployment uses Windows Task Scheduler under the user's account and may run while the user is logged out.
 
 A failed collection run shall not corrupt or discard previously collected traffic history.
 
-## 9. Authentication
+### 9. Authentication
 
 The application shall authenticate to GitHub using a dedicated access token supplied through the `GITHUB_TOKEN` environment variable.
 
@@ -141,7 +145,7 @@ Credentials shall not be stored in the SQLite database or committed to the sourc
 
 The authenticated credentials must have sufficient permission to retrieve traffic data for every repository to be monitored.
 
-## 10. Error handling
+### 10. Error handling
 
 Failure to collect traffic for one repository shall not prevent collection from continuing for other repositories.
 
@@ -149,9 +153,9 @@ Collection failures shall identify the affected repository and provide enough di
 
 The application shall return a non-zero exit status when a collection run contains failures that require operator attention.
 
-## 11. Initial scope exclusions
+### 11. Core scope exclusions
 
-The first version does not require:
+The core does not require:
 
 - monitoring repositories owned by other users or organizations
 - monitoring forked repositories
@@ -163,10 +167,47 @@ The first version does not require:
 
 Popular paths may be added in a later version without changing the core daily traffic model.
 
-## 12. Design goals
+### 12. Design goals
 
 The implementation should remain small, understandable, and easy to operate.
 
 The collector should prefer GitHub's documented API over scraping GitHub web pages.
 
 The SQLite database should remain portable and directly inspectable with standard SQLite tools.
+
+## User interface
+
+### 1. Architecture
+
+The user interface shall be implemented as a separate application from the core collector.
+
+The user interface shall read traffic data from the existing SQLite database and shall not require direct access to the GitHub API for normal reporting.
+
+The user interface shall run from the same codebase on Windows and Linux.
+
+The initial user interface shall be implemented using Streamlit and displayed in a web browser.
+
+### 2. Repository selection
+
+The user interface shall provide a drop-down control for selecting a repository.
+
+Repository selection shall use the current repository name from `repository_names`. Historical repository names shall not appear as separate repositories.
+
+### 3. Traffic display
+
+For the selected repository, the user interface shall display daily views and clones as a bar chart.
+
+The user interface shall provide a control for selecting the reporting period. The default reporting period shall be 14 days.
+
+### 4. Referrers
+
+For the selected repository, the user interface shall display the most recently collected referrer data available in `referral_traffic`.
+
+The referrer display shall include:
+
+- referrer
+- views
+- unique visitors
+- the collection date, identified as "As of"
+
+The collection date shall not be presented as the date on which the underlying referred traffic occurred.
