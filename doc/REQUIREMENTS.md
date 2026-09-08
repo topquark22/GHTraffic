@@ -185,9 +185,11 @@ The user interface shall read traffic data from the existing SQLite database and
 
 The user interface shall run from the same codebase on Windows and Linux.
 
-The initial user interface shall be implemented using FastAPI with a small HTML/JavaScript front end and displayed in a web browser.
+The user interface shall use only the Python standard library for its HTTP server and API endpoints, together with a small HTML/JavaScript front end displayed in a web browser.
 
 The UI shall serve its required JavaScript assets locally so normal use does not depend on an external CDN.
+
+The UI shall not require third-party Python packages.
 
 ### 2. Repository selection
 
