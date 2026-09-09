@@ -1,6 +1,6 @@
 # Vendored static assets
 
-GitHubMonitor serves browser assets from this directory so the UI can run without a CDN dependency.
+GHTraffic serves browser assets from this directory so the UI can run without a CDN dependency.
 
 Chart.js is pinned to version 4.5.1. The expected file is:
 
