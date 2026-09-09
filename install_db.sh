@@ -47,18 +47,18 @@ platform="$(uname -s)"
 
 if [[ -n "$db_override" ]]; then
   db_file="$db_override"
-elif [[ -n "${GITHUBMONITOR_DB:-}" ]]; then
-  db_file="$GITHUBMONITOR_DB"
+elif [[ -n "${GHTRAFFIC_DB:-}" ]]; then
+  db_file="$GHTRAFFIC_DB"
 elif [[ "$platform" == CYGWIN* || "$platform" == MINGW* || "$platform" == MSYS* ]]; then
   if [[ -z "${LOCALAPPDATA:-}" ]]; then
     echo "Error: LOCALAPPDATA is not set" >&2
     exit 1
   fi
 
-  db_file="$LOCALAPPDATA/GitHubMonitor/githubtraffic.db"
+  db_file="$LOCALAPPDATA/GHTraffic/githubtraffic.db"
 else
   data_home="${XDG_DATA_HOME:-$HOME/.local/share}"
-  db_file="$data_home/githubmonitor/githubtraffic.db"
+  db_file="$data_home/ghtraffic/githubtraffic.db"
 fi
 
 if [[ "$platform" == CYGWIN* || "$platform" == MINGW* || "$platform" == MSYS* ]]; then
