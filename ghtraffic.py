@@ -12,7 +12,7 @@ from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 
-DB_FILENAME = "githubtraffic.db"
+DB_FILENAME = "ghtraffic.db"
 GITHUB_API = "https://api.github.com"
 REQUIRED_TABLES = {
     "repositories",
@@ -481,7 +481,7 @@ def parse_args():
     parser.add_argument(
         "--db",
         type=Path,
-        help="path to githubtraffic.db",
+        help="path to ghtraffic.db",
     )
 
     subparsers = parser.add_subparsers(dest="command", required=True)

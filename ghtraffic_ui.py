@@ -10,7 +10,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 
-DB_FILENAME = "githubtraffic.db"
+DB_FILENAME = "ghtraffic.db"
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 HOST = "127.0.0.1"
 PORT = 8501
