@@ -55,10 +55,10 @@ elif [[ "$platform" == CYGWIN* || "$platform" == MINGW* || "$platform" == MSYS* 
     exit 1
   fi
 
-  db_file="$LOCALAPPDATA/GHTraffic/githubtraffic.db"
+  db_file="$LOCALAPPDATA/GHTraffic/ghtraffic.db"
 else
   data_home="${XDG_DATA_HOME:-$HOME/.local/share}"
-  db_file="$data_home/ghtraffic/githubtraffic.db"
+  db_file="$data_home/ghtraffic/ghtraffic.db"
 fi
 
 if [[ "$platform" == CYGWIN* || "$platform" == MINGW* || "$platform" == MSYS* ]]; then
