@@ -1,8 +1,8 @@
-# GitHubMonitor Data Model
+# GHTraffic Data Model
 
 ## Overview
 
-GitHubMonitor uses the stable numeric GitHub repository ID as the canonical identifier for a repository. Repository names are treated as mutable historical attributes because a repository may be renamed without changing its GitHub ID.
+GHTraffic uses the stable numeric GitHub repository ID as the canonical identifier for a repository. Repository names are treated as mutable historical attributes because a repository may be renamed without changing its GitHub ID.
 
 Traffic records therefore reference `repository_id`, never a repository name.
 
@@ -103,7 +103,7 @@ Forked repositories are excluded from collection before they are inserted by the
 
 This table records repository naming history.
 
-A repository may have only one row whose `valid_to` is `NULL`; that row represents the current name. When a rename or ownership change is detected, GitHubMonitor closes the current row by setting `valid_to` and inserts a new row with the same `repository_id`.
+A repository may have only one row whose `valid_to` is `NULL`; that row represents the current name. When a rename or ownership change is detected, GHTraffic closes the current row by setting `valid_to` and inserts a new row with the same `repository_id`.
 
 `owner_login`, `repository_name`, and `full_name` are retained so reports can use the current repository name while historical identity remains tied to the stable GitHub ID.
 
