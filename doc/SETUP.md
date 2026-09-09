@@ -1,10 +1,10 @@
-# GitHubMonitor Setup
+# GHTraffic Setup
 
-This document describes the Windows setup for GitHubMonitor.
+This document describes the Windows setup for GHTraffic.
 
 ## 1. Python
 
-GitHubMonitor runs using native Windows Python 3. Python's standard library includes the `sqlite3` module, so no separate Python SQLite package is required.
+GHTraffic runs using native Windows Python 3. Python's standard library includes the `sqlite3` module, so no separate Python SQLite package is required.
 
 Verify Python and SQLite support from Command Prompt or PowerShell:
 
@@ -26,7 +26,7 @@ For the current development machine, the native interpreter is:
 
 ## 2. SQLite
 
-GitHubMonitor uses Python's built-in `sqlite3` module to access the database. The standalone SQLite command-line program is optional and is useful for inspecting and querying the database manually.
+GHTraffic uses Python's built-in `sqlite3` module to access the database. The standalone SQLite command-line program is optional and is useful for inspecting and querying the database manually.
 
 On Windows, use the native Windows SQLite command-line tools rather than the Cygwin SQLite package.
 
@@ -41,13 +41,13 @@ githubtraffic.db
 On Windows, its default location is:
 
 ```text
-%LOCALAPPDATA%\GitHubMonitor\githubtraffic.db
+%LOCALAPPDATA%\GHTraffic\githubtraffic.db
 ```
 
 Create the directory if it does not already exist:
 
 ```cmd
-mkdir "%LOCALAPPDATA%\GitHubMonitor"
+mkdir "%LOCALAPPDATA%\GHTraffic"
 ```
 
 The application determines this location at runtime from the `LOCALAPPDATA` environment variable rather than hard-coding a user profile path.
@@ -55,18 +55,18 @@ The application determines this location at runtime from the `LOCALAPPDATA` envi
 An explicit database path may be supplied through the environment variable:
 
 ```text
-GITHUBMONITOR_DB
+GHTRAFFIC_DB
 ```
 
-When set, `GITHUBMONITOR_DB` overrides the platform default.
+When set, `GHTRAFFIC_DB` overrides the platform default.
 
 The `--db` command-line option overrides both the environment variable and the platform default. This is useful for local testing:
 
 ```cmd
-python githubmon.py --db githubtraffic.db show
+python ghtraffic.py --db githubtraffic.db show
 ```
 
-The live database should not be stored in or committed to the GitHubMonitor source repository.
+The live database should not be stored in or committed to the GHTraffic source repository.
 
 ## 4. Initialize the database
 
@@ -86,7 +86,7 @@ The installer expects the target database not to exist already. It runs `ddl.sql
 
 ## 5. Windows scheduled task
 
-GitHubMonitor runs once per day using Windows Task Scheduler. It does not require a continuously running Windows service.
+GHTraffic runs once per day using Windows Task Scheduler. It does not require a continuously running Windows service.
 
 Create the task using **Task Scheduler -> Create Task** rather than Create Basic Task.
 
@@ -95,10 +95,10 @@ Create the task using **Task Scheduler -> Create Task** rather than Create Basic
 Use:
 
 ```text
-Name: GitHubMonitor
+Name: GHTraffic
 ```
 
-Configure the task to run under the Windows user account that owns the GitHubMonitor data and credentials.
+Configure the task to run under the Windows user account that owns the GHTraffic data and credentials.
 
 Select:
 
@@ -106,7 +106,7 @@ Select:
 Run whether user is logged on or not
 ```
 
-GitHubMonitor does not normally require **Run with highest privileges**.
+GHTraffic does not normally require **Run with highest privileges**.
 
 ### Trigger
 
@@ -127,7 +127,7 @@ Use the actual full path to `python.exe` when configuring Task Scheduler.
 Add arguments:
 
 ```text
-<path-to-GitHubMonitor>\githubmon.py collect
+<path-to-GHTraffic>\ghtraffic.py collect
 ```
 
 If the project path contains spaces, quote the script path in the arguments field.
@@ -135,7 +135,7 @@ If the project path contains spaces, quote the script path in the arguments fiel
 Start in:
 
 ```text
-<path-to-GitHubMonitor>
+<path-to-GHTraffic>
 ```
 
 Do not use Cygwin `/usr/bin/python3` for the scheduled Windows task.
@@ -168,7 +168,7 @@ If appropriate for the machine, configure Task Scheduler to wake the computer fo
 
 ## 6. Unattended execution
 
-The scheduled task runs under the user's Windows account even when that user is not logged in. GitHubMonitor must therefore be fully non-interactive during scheduled collection.
+The scheduled task runs under the user's Windows account even when that user is not logged in. GHTraffic must therefore be fully non-interactive during scheduled collection.
 
 In particular:
 
@@ -187,15 +187,15 @@ Before relying on the daily trigger:
 2. Use Task Scheduler's **Run** command or:
 
    ```cmd
-   schtasks /run /tn "\GitHubMonitor"
+   schtasks /run /tn "\GHTraffic"
    ```
 
 3. Inspect the result with:
 
    ```cmd
-   schtasks /query /tn "\GitHubMonitor" /v /fo LIST
+   schtasks /query /tn "\GHTraffic" /v /fo LIST
    ```
 
 4. Confirm that `Last Result` is `0` and that the production database has been updated.
 
-The deployed v0.1.0 configuration has been verified to run successfully under the user's Windows account while the user is logged out.
+The deployed configuration has been verified to run successfully under the user's Windows account while the user is logged out.
