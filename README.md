@@ -9,3 +9,4 @@ The current version monitors all non-fork repositories owned by the authenticate
 - [Setup](doc/SETUP.md)
 - [GitHub authentication](doc/GITHUB_SETUP.md)
 - [Deployment](doc/DEPLOYMENT.md)
+- [Command-line usage](doc/USAGE.md)
