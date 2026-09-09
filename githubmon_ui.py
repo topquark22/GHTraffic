@@ -12,6 +12,7 @@ from urllib.parse import parse_qs, urlparse
 
 DB_FILENAME = "githubtraffic.db"
 STATIC_DIR = Path(__file__).resolve().parent / "static"
+ICONS_DIR = Path(__file__).resolve().parent / "icons"
 HOST = "127.0.0.1"
 PORT = 8501
 
@@ -119,6 +120,7 @@ INDEX_HTML = """<!doctype html>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>GitHubMonitor</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png">
   <script src="/static/chart.umd.min.js"></script>
   <style>
     body {
@@ -347,6 +349,18 @@ class RequestHandler(BaseHTTPRequestHandler):
                 chart_path = STATIC_DIR / "chart.umd.min.js"
                 data = chart_path.read_bytes()
                 self.send_bytes(data, "text/javascript; charset=utf-8")
+                return
+
+            if parsed.path == "/icons/icon-32.png":
+                icon_path = ICONS_DIR / "icon-32.png"
+                data = icon_path.read_bytes()
+                self.send_bytes(data, "image/png")
+                return
+
+            if parsed.path == "/favicon.ico":
+                icon_path = ICONS_DIR / "favicon.ico"
+                data = icon_path.read_bytes()
+                self.send_bytes(data, "image/x-icon")
                 return
 
             query = parse_qs(parsed.query)
