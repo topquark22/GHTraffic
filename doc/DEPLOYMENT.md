@@ -79,7 +79,7 @@ Start in `%LOCALAPPDATA%\GHTraffic\`
 - Allow task to be run on demand
 - Run task as soon as possible after a scheduled start is missed
 - If the task is already running, do not start a new instance
-- 
+
 After creating the task, use **Run** in Task Scheduler and verify that the database is updated successfully.
 
 ## Test the user interface
