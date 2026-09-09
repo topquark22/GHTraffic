@@ -57,12 +57,24 @@ The collector requires `GITHUB_TOKEN` to be available in its environment. See [G
 Create a Windows Task Scheduler task named, for example:
 
 ```text
-GHTraffic Collector
+GHTraffic collector
 ```
-
-Configure it to run once per day under the user's account, including when the user is logged out.
-
 Recommended settings:
+
+**General:** 
+Run whether the user is logged in or not.
+
+**Triggers**
+- One time
+- Repeat task every 1 hour
+- Enabled
+
+**Actions**
+Start a program
+```
+%LOCALAPPDATA%\Python\bin\python.exe %LOCALAPPDATA%\GHTraffic\ghtraffic.py collect
+```
+Start in `%LOCALAPPDATA%\GHTraffic\`
 
 - Select **Run whether user is logged on or not**.
 - Use a daily trigger at the desired collection time.
