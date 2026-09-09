@@ -66,7 +66,7 @@ Run whether the user is logged in or not.
 
 **Triggers**
 - One time
-- Repeat task every 1 hour
+- After triggered, repeat every 1 hour indefinitely
 - Enabled
 
 **Actions**
@@ -76,13 +76,11 @@ Start a program
 ```
 Start in `%LOCALAPPDATA%\GHTraffic\`
 
-- Select **Run whether user is logged on or not**.
-- Use a daily trigger at the desired collection time.
-- Set the action to run the native Windows `python.exe`.
-- Pass `%LOCALAPPDATA%\GHTraffic\ghtraffic.py collect` as the arguments. If Task Scheduler does not expand the environment variable, use the full expanded path instead.
-- Set **Start in** to `%LOCALAPPDATA%\GHTraffic`, or its full expanded path.
-- Set **If the task is already running** to **Do not start a new instance**.
-
+**Settings**
+- Allow task to be run on demand
+- Run task as soon as possible after a scheduled start is missed
+- If the task is already running, do not start a new instance
+- 
 After creating the task, use **Run** in Task Scheduler and verify that the database is updated successfully.
 
 ## Test the user interface
