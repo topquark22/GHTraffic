@@ -120,7 +120,7 @@ INDEX_HTML = """<!doctype html>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>GitHubMonitor</title>
-  <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png">
+  <link rel="icon" href="/static/favicon.ico">
   <script src="/static/chart.umd.min.js"></script>
   <style>
     body {
