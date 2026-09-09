@@ -35,7 +35,7 @@ On Windows, use the native Windows SQLite command-line tools rather than the Cyg
 The database file is named:
 
 ```text
-githubtraffic.db
+ghtraffic.db
 ```
 
 On Windows, its default location is:
@@ -63,7 +63,7 @@ When set, `GHTRAFFIC_DB` overrides the platform default.
 The `--db` command-line option overrides both the environment variable and the platform default. This is useful for local testing:
 
 ```cmd
-python ghtraffic.py --db githubtraffic.db show
+python ghtraffic.py --db ghtraffic.db show
 ```
 
 The live database should not be stored in or committed to the GHTraffic source repository.
@@ -79,7 +79,7 @@ Run:
 To initialize an alternate database for testing:
 
 ```bash
-./install_db.sh -d ./githubtraffic.db
+./install_db.sh -d ./ghtraffic.db
 ```
 
 The installer expects the target database not to exist already. It runs `ddl.sql` to create the schema.
@@ -95,7 +95,7 @@ Create the task using **Task Scheduler -> Create Task** rather than Create Basic
 Use:
 
 ```text
-Name: GHTraffic
+Name: GHTraffic collector
 ```
 
 Configure the task to run under the Windows user account that owns the GHTraffic data and credentials.
