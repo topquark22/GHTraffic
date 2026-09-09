@@ -96,6 +96,14 @@ If the page loads but the traffic chart is missing, verify that this file exists
 %LOCALAPPDATA%\GitHubMonitor\static\chart.umd.min.js
 ```
 
+### Traffic history availability
+
+The **Period** selector limits the chart to the requested number of days, but GitHubMonitor displays only traffic records that actually exist in the local database.
+
+GitHub's traffic API supplies only a short window of recent daily traffic data. GitHubMonitor preserves those records on each collection so that a longer history accumulates over time. Consequently, a new installation may have only about 14 days of history even when **30 days** or **90 days** is selected. As scheduled collection continues, those longer views will gradually extend to the full requested period.
+
+GitHubMonitor does not synthesize zero-valued records for dates before collection began or for other dates for which no record exists. A missing record means that traffic is unknown; it must not be interpreted as zero views or zero clones.
+
 ## Run the user interface continuously
 
 Create a second Task Scheduler task for the UI, separate from the daily collector task. A name such as the following is suitable:
