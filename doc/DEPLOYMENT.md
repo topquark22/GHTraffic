@@ -18,7 +18,7 @@ The deployed installation should contain:
 %LOCALAPPDATA%\GHTraffic\
     ghtraffic.py
     ghtraffic_ui.py
-    githubtraffic.db
+    ghraffic.db
     static\
         chart.umd.min.js
         favicon.ico
