@@ -59,10 +59,9 @@ Create a Windows Task Scheduler task named, for example:
 ```text
 GHTraffic collector
 ```
-Recommended settings:
 
 **General:** 
-Run whether the user is logged in or not.
+- Run whether the user is logged in or not
 
 **Triggers**
 - One time
