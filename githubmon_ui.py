@@ -81,23 +81,13 @@ def get_traffic(repository_id, days):
     with connect_db() as connection:
         rows = connection.execute(
             """
-            WITH RECURSIVE dates(traffic_date) AS (
-                SELECT date('now', ?)
-                UNION ALL
-                SELECT date(traffic_date, '+1 day')
-                FROM dates
-                WHERE traffic_date < date('now')
-            )
-            SELECT dates.traffic_date,
-                   COALESCE(t.views, 0) AS views,
-                   COALESCE(t.clones, 0) AS clones
-            FROM dates
-            LEFT JOIN daily_traffic AS t
-                ON t.repository_id = ?
-               AND t.traffic_date = dates.traffic_date
-            ORDER BY dates.traffic_date
+            SELECT traffic_date, views, clones
+            FROM daily_traffic
+            WHERE repository_id = ?
+              AND traffic_date >= date('now', ?)
+            ORDER BY traffic_date
             """,
-            (f"-{days - 1} days", repository_id),
+            (repository_id, f"-{days - 1} days"),
         ).fetchall()
 
     return [dict(row) for row in rows]
