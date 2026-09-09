@@ -1,10 +1,10 @@
-# GitHubMonitor Requirements
+# GHTraffic Requirements
 
 ## Core
 
 ### 1. Purpose
 
-GitHubMonitor collects repository traffic statistics from GitHub and maintains a local historical record that is not limited by GitHub's short traffic-retention window.
+GHTraffic collects repository traffic statistics from GitHub and maintains a local historical record that is not limited by GitHub's short traffic-retention window.
 
 The initial version focuses on repository views and clones across all non-fork repositories owned by the authenticated GitHub user.
 
@@ -162,7 +162,7 @@ The core does not require:
 - a graphical or web user interface
 - GitHub Actions as the required scheduler
 - storage of individual visitor identities
-- reconstruction of historical traffic older than the data available when GitHubMonitor is first run
+- reconstruction of historical traffic older than the data available when GHTraffic is first run
 - popular-path collection
 
 Popular paths may be added in a later version without changing the core daily traffic model.
@@ -202,6 +202,8 @@ Repository selection shall use the current repository name from `repository_name
 For the selected repository, the user interface shall display daily views and clones as a bar chart.
 
 The user interface shall provide a control for selecting the reporting period. The default reporting period shall be 14 days.
+
+The reporting period is an upper bound on the requested history. The UI shall display only traffic records that actually exist in the local database and shall not synthesize zero-valued records for missing historical dates.
 
 ### 4. Referrers
 
