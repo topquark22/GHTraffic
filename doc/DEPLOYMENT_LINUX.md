@@ -51,7 +51,7 @@ The deployed application directory should contain:
         favicon.ico
 ```
 
-The GitHub credential is stored separately in:
+The GitHub credential and database location are stored separately in:
 
 ```text
 ~/.config/ghtraffic/ghtraffic.properties
@@ -82,31 +82,26 @@ The default Linux database path is:
 ~/.local/share/ghtraffic/ghtraffic.db
 ```
 
-The main `install.py` installer initializes the database automatically when it does not already exist and preserves an existing database during upgrades.
+The main `install.py` installer writes this location to `database.path` in `ghtraffic.properties`, initializes the database automatically when it does not already exist, and preserves an existing database during upgrades.
 
-For database-only initialization, run the database installer from the source tree:
-
-```bash
-./install_db.sh
-```
-
-To initialize another database explicitly:
+For a fresh installation, run:
 
 ```bash
-./install_db.sh -d /path/to/ghtraffic.db
+python3 install.py
 ```
 
 ## Configure GitHub authentication
 
-GHTraffic reads the GitHub access token from:
+GHTraffic reads configuration from:
 
 ```text
 ~/.config/ghtraffic/ghtraffic.properties
 ```
 
-The required property is:
+The normal properties are:
 
 ```text
+database.path=/home/user/.local/share/ghtraffic/ghtraffic.db
 github.token=github_pat_...
 ```
 
@@ -116,9 +111,9 @@ Restrict access to the file:
 chmod 600 ~/.config/ghtraffic/ghtraffic.properties
 ```
 
-When `install.py` is run and no token is already configured, it prompts for the token without echoing it to the terminal and creates this file automatically. Existing credential configuration is preserved.
+When `install.py` is run and no token is already configured, it prompts for the token without echoing it to the terminal and creates or updates this file automatically. Existing configuration is preserved.
 
-No `GITHUB_TOKEN` environment variable or systemd environment file is required.
+No `GITHUB_TOKEN` or database-location environment variable is required.
 
 Do not commit the properties file or place the token in a systemd unit.
 
@@ -136,11 +131,7 @@ Then verify the report:
 python3 ~/.local/lib/ghtraffic/ghtraffic.py show
 ```
 
-The collector should update:
-
-```text
-~/.local/share/ghtraffic/ghtraffic.db
-```
+The collector should update the database configured by `database.path`.
 
 ## Schedule the collector with systemd
 
