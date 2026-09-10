@@ -166,7 +166,7 @@ INDEX_HTML = """<!doctype html>
 </head>
 <body>
 
-  <h1 id="pageTitle">GHTraffic</h1>
+  <h1 id="pageTitle">GitHub Traffic</h1>
 
   <div class="controls">
     <label>
@@ -205,7 +205,7 @@ INDEX_HTML = """<!doctype html>
 
   <br/><br/>
   <p style="text-align: center;">
-    <small>Copyright 2026, 
+    <small>GHTraffic Copyright 2026, 
       <a href="https://github.com/topquark22/GHTraffic/" target="_blank">topquark22</a>
     </small>
   </p>
@@ -234,7 +234,7 @@ INDEX_HTML = """<!doctype html>
       }
 
       if (repositories.length > 0) {
-        pageTitle.textContent = `GHTraffic — ${repositories[0].owner_login}`;
+        pageTitle.textContent = `GitHub Traffic — ${repositories[0].owner_login}`;
       }
 
       if (selectedRepository && repositories.some(
