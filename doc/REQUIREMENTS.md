@@ -129,11 +129,19 @@ The application shall provide a `referrers` command that reports the most recent
 
 ### 8. Scheduling
 
-The collector shall be suitable for unattended execution once per day.
-
 Scheduling shall be external to the core collector so the program can be run manually or by an operating-system scheduler.
 
-On Windows, the supported deployment uses Windows Task Scheduler under the user's account and may run while the user is logged out.
+The normal scheduled collection interval shall be one hour.
+
+On Windows, the default installation shall configure the collector to run hourly only while the user is logged on. This default shall not require the installer to request, handle, or store the user's Windows password.
+
+The Windows installer shall run an initial collection during installation so useful data is available immediately and shall configure the scheduled task without requiring the user to manually choose a future start date or time.
+
+Because each collection refreshes the complete recent views/clones window returned by GitHub, missed hourly runs while the user is logged out or the computer is off shall normally be recovered by the next successful collection. If collection is interrupted for longer than GitHub's traffic-retention window, older daily views/clones that are no longer returned by GitHub cannot be reconstructed and a gap may remain in the local history.
+
+Documentation shall describe this trade-off and shall provide an optional advanced Windows configuration for users who require collection while logged out. That configuration may require Windows credentials because it uses the operating system's unattended task execution mechanism.
+
+On Linux, scheduled collection shall use the native user service/timer mechanism and shall run hourly.
 
 A failed collection run shall not corrupt or discard previously collected traffic history.
 
@@ -174,6 +182,30 @@ The implementation should remain small, understandable, and easy to operate.
 The collector should prefer GitHub's documented API over scraping GitHub web pages.
 
 The SQLite database should remain portable and directly inspectable with standard SQLite tools.
+
+### 13. Installation
+
+GHTraffic shall provide a single Python installation program that supports both Windows and Linux.
+
+The installer shall detect the host operating system and keep operating-system-specific installation behavior isolated from the shared installation logic.
+
+The installer shall:
+
+- create the appropriate application and data directories;
+- install or update `ghtraffic.py`, `ghtraffic_ui.py`, and required static assets;
+- initialize `ghtraffic.db` from `ddl.sql` when the database does not already exist;
+- preserve an existing database during upgrades;
+- verify that the required Python and SQLite support is available;
+- configure the platform's supported collector scheduling mechanism;
+- configure the user interface to start automatically using the platform's supported mechanism;
+- run an initial collection when credentials are available; and
+- start the user interface and report its local URL when installation completes successfully.
+
+The installer shall not overwrite an existing database or silently replace existing credential configuration.
+
+The installer shall not require Cygwin on Windows. Native Windows installation shall rely on Python's standard-library SQLite support rather than requiring a separate `sqlite3.exe` installation.
+
+Platform-specific scheduling and service configuration shall remain outside the core collector and UI code wherever practical.
 
 ## User interface
 
