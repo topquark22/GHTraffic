@@ -2,6 +2,14 @@
 
 This document describes the Windows setup for GHTraffic.
 
+For the normal installation path, configure `GITHUB_TOKEN` as described in [GITHUB_SETUP.md](GITHUB_SETUP.md) and run:
+
+```cmd
+python install.py
+```
+
+The installer performs the application deployment, database initialization, hourly Task Scheduler configuration, initial collection when credentials are available, and UI startup. The remaining sections document the underlying Windows setup in more detail.
+
 ## 1. Python
 
 GHTraffic runs using native Windows Python 3. Python's standard library includes the `sqlite3` module, so no separate Python SQLite package is required.
@@ -12,7 +20,7 @@ Verify Python and SQLite support from Command Prompt or PowerShell:
 python -c "import sys, sqlite3; print(sys.executable); print(sqlite3.sqlite_version)"
 ```
 
-For unattended execution, use the full path to the real Python interpreter rather than the WindowsApps Python alias. The interpreter path can be found with:
+For scheduled execution, use the full path to the real Python interpreter rather than the WindowsApps Python alias. The interpreter path can be found with:
 
 ```cmd
 where python
@@ -28,7 +36,7 @@ For the current development machine, the native interpreter is:
 
 GHTraffic uses Python's built-in `sqlite3` module to access the database. The standalone SQLite command-line program is optional and is useful for inspecting and querying the database manually.
 
-On Windows, use the native Windows SQLite command-line tools rather than the Cygwin SQLite package.
+No Cygwin SQLite package is required.
 
 ## 3. Database location
 
@@ -68,15 +76,17 @@ python ghtraffic.py --db ghtraffic.db show
 
 The live database should not be stored in or committed to the GHTraffic source repository.
 
-## 4. Initialize the database
+## 4. Initialize the database manually
 
-From Command Prompt, run:
+The main `install.py` installer initializes the database automatically when it does not already exist and preserves an existing database during upgrades.
+
+For database-only initialization from Command Prompt, run:
 
 ```cmd
 install_db.bat
 ```
 
-The Windows installer uses Python's built-in `sqlite3` module, so neither Cygwin nor the standalone SQLite command-line program is required.
+The Windows database installer uses Python's built-in `sqlite3` module, so neither Cygwin nor the standalone SQLite command-line program is required.
 
 To initialize an alternate database for testing:
 
@@ -84,126 +94,59 @@ To initialize an alternate database for testing:
 install_db.bat -d .\ghtraffic.db
 ```
 
-`GHTRAFFIC_DB` is honored when `-d` is not supplied. Otherwise the installer creates the database at the standard Windows location:
-
-```text
-%LOCALAPPDATA%\GHTraffic\ghtraffic.db
-```
-
-The installer runs `ddl.sql` to create the schema.
+`GHTRAFFIC_DB` is honored when `-d` is not supplied. Otherwise the installer creates the database at the standard Windows location.
 
 ## 5. Windows scheduled task
 
-GHTraffic runs once per day using Windows Task Scheduler. It does not require a continuously running Windows service.
-
-Create the task using **Task Scheduler -> Create Task** rather than Create Basic Task.
-
-### General
-
-Use:
+The normal installation configures a Task Scheduler task named:
 
 ```text
-Name: GHTraffic collector
+GHTraffic Collector
 ```
 
-Configure the task to run under the Windows user account that owns the GHTraffic data and credentials.
+The collector runs once per hour while the user is logged on. This is the default because it does not require the user's Windows password.
 
-Select:
+The installer computes a valid first start time automatically, a few minutes in the future, and runs one initial collection immediately when `GITHUB_TOKEN` is available. The user therefore does not have to choose a future start date or time manually.
+
+The task runs under the Windows user account that owns the GHTraffic data and credentials, uses the native Windows Python interpreter, and is configured not to start overlapping collector instances.
+
+Short interruptions do not normally create gaps because each collection refreshes the recent daily traffic window returned by GitHub. If no collection succeeds for longer than GitHub's retention window, older daily traffic that GitHub no longer returns cannot be reconstructed.
+
+For users who require collection while logged out, see [DEPLOYMENT.md](DEPLOYMENT.md). That optional configuration may require Windows credentials.
+
+## 6. User interface task
+
+The installer creates a separate task named:
 
 ```text
-Run whether user is logged on or not
+GHTraffic UI
 ```
 
-GHTraffic does not normally require **Run with highest privileges**.
+The UI task starts at user logon and runs only under the logged-on user's interactive session. It does not require elevated privileges or the user's Windows password.
 
-### Trigger
-
-Create a daily trigger. The exact collection time is not critical because each collection run refreshes the recent traffic window returned by GitHub rather than collecting only a single day's values.
-
-### Action
-
-Configure the action as **Start a program**.
-
-Program/script:
+The UI remains available at:
 
 ```text
-%LOCALAPPDATA%\Python\bin\python.exe
+http://127.0.0.1:8501
 ```
-
-Use the actual full path to `python.exe` when configuring Task Scheduler.
-
-Add arguments:
-
-```text
-<path-to-GHTraffic>\ghtraffic.py collect
-```
-
-If the project path contains spaces, quote the script path in the arguments field.
-
-Start in:
-
-```text
-<path-to-GHTraffic>
-```
-
-Do not use Cygwin `/usr/bin/python3` for the scheduled Windows task.
-
-### Settings
-
-Enable:
-
-```text
-Run task as soon as possible after a scheduled start is missed
-```
-
-This allows collection to occur after startup if the computer was powered off at the scheduled time.
-
-For:
-
-```text
-If the task is already running
-```
-
-select:
-
-```text
-Do not start a new instance
-```
-
-This prevents overlapping collectors from accessing the same SQLite database unnecessarily.
-
-If appropriate for the machine, configure Task Scheduler to wake the computer for the task.
-
-## 6. Unattended execution
-
-The scheduled task runs under the user's Windows account even when that user is not logged in. GHTraffic must therefore be fully non-interactive during scheduled collection.
-
-In particular:
-
-- GitHub authentication must not require an interactive prompt.
-- The database directory must be writable by the scheduled-task user.
-- Collection errors are reported through process exit status and console output.
-- A failed collection must not damage previously collected traffic data.
-
-See [GITHUB_SETUP.md](GITHUB_SETUP.md) for creation of a dedicated GitHub access token and configuration of `GITHUB_TOKEN`.
 
 ## 7. Test the deployment
 
-Before relying on the daily trigger:
+After installation:
 
-1. Run the collector manually and verify the database contents.
-2. Use Task Scheduler's **Run** command or:
-
-   ```cmd
-   schtasks /run /tn "\GHTraffic"
-   ```
-
-3. Inspect the result with:
+1. Open `http://127.0.0.1:8501` and verify the repository list and chart.
+2. Query the collector task:
 
    ```cmd
-   schtasks /query /tn "\GHTraffic" /v /fo LIST
+   schtasks /query /tn "\GHTraffic Collector" /v /fo LIST
    ```
 
-4. Confirm that `Last Result` is `0` and that the production database has been updated.
+3. Query the UI task:
 
-The deployed configuration has been verified to run successfully under the user's Windows account while the user is logged out.
+   ```cmd
+   schtasks /query /tn "\GHTraffic UI" /v /fo LIST
+   ```
+
+4. Confirm that successful collector runs report `Last Result: 0` and that the production database is being updated.
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for the detailed manual Windows deployment procedure.
