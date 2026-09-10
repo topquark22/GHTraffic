@@ -1,4 +1,4 @@
-# GHTraffic Deployment
+# GHTraffic Deployment - Windows
 
 This document describes manual deployment of GHTraffic on Windows after the initial setup and GitHub authentication steps have been completed.
 
