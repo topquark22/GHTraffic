@@ -27,6 +27,7 @@ The deployed installation should contain:
     ghtraffic.py
     ghtraffic_ui.py
     ghtraffic.db
+    ghtraffic.properties
     static\
         chart.umd.min.js
         favicon.ico
@@ -44,6 +45,20 @@ xcopy /E /I /Y static "%LOCALAPPDATA%\GHTraffic\static"
 
 The database should already exist in `%LOCALAPPDATA%\GHTraffic` after the database installation step.
 
+The GitHub token is stored separately from the source files in:
+
+```text
+%LOCALAPPDATA%\GHTraffic\ghtraffic.properties
+```
+
+with:
+
+```text
+github.token=github_pat_...
+```
+
+See [GITHUB_SETUP.md](GITHUB_SETUP.md).
+
 ## Test the collector
 
 Run the deployed collector manually before enabling scheduled execution:
@@ -58,7 +73,7 @@ Verify that the command completes successfully and updates:
 %LOCALAPPDATA%\GHTraffic\ghtraffic.db
 ```
 
-The collector requires `GITHUB_TOKEN` to be available in its environment. See [GITHUB_SETUP.md](GITHUB_SETUP.md).
+The collector reads the GitHub token directly from `ghtraffic.properties`. No credential environment variable is required.
 
 ## Schedule the collector
 
@@ -119,6 +134,8 @@ Run whether user is logged on or not
 ```
 
 Windows normally asks for the user's password when this task mode is configured. GHTraffic does not request, handle, or store that Windows password itself.
+
+The collector still reads its GitHub token from `ghtraffic.properties`; no Task Scheduler credential environment variable is required.
 
 The UI does not need to run while the user is logged out.
 
@@ -197,7 +214,7 @@ The simplest update procedure is to run the current installer again:
 python install.py
 ```
 
-The installer replaces the application and static files, preserves the existing database and credential configuration, updates the scheduled tasks, and restarts the UI.
+The installer replaces the application and static files, preserves the existing database and `ghtraffic.properties`, updates the scheduled tasks, and restarts the UI.
 
 For a manual update, copy the updated scripts and static files into `%LOCALAPPDATA%\GHTraffic` again:
 
