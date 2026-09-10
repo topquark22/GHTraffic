@@ -267,6 +267,12 @@ INDEX_HTML = """<!doctype html>
           responsive: true,
           maintainAspectRatio: false,
           scales: {
+            x: {
+              title: {
+                display: true,
+                text: 'Date (UTC)'
+              }
+            },
             y: {
               beginAtZero: true,
               ticks: { precision: 0 }
