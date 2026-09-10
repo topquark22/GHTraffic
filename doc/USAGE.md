@@ -16,7 +16,7 @@ Run:
 python ghtraffic.py collect
 ```
 
-The `collect` command connects to GitHub using the access token in `GITHUB_TOKEN`, discovers all non-fork repositories owned by the authenticated user, and collects the latest available:
+The `collect` command connects to GitHub using the access token stored as `github.token` in `ghtraffic.properties`, discovers all non-fork repositories owned by the authenticated user, and collects the latest available:
 
 - views and unique visitors;
 - clones and unique cloners; and
