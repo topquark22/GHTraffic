@@ -69,6 +69,8 @@ def get_repositories(days):
                AND t.traffic_date >= date('now', ?)
             WHERE n.valid_to IS NULL
             GROUP BY n.repository_id, n.owner_login, n.repository_name
+            HAVING COALESCE(SUM(t.views), 0) > 0
+                OR COALESCE(SUM(t.clones), 0) > 0
             ORDER BY COALESCE(SUM(t.views), 0) DESC, n.repository_name COLLATE NOCASE
             """,
             (f"-{days - 1} days",),
