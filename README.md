@@ -20,6 +20,6 @@ For manual installation and platform-specific details, see the deployment docume
 
 - [Setup](doc/SETUP.md)
 - [GitHub authentication](doc/GITHUB_SETUP.md)
-- [Windows deployment](doc/DEPLOYMENT.md)
-- [Linux deployment](doc/DEPLOYMENT_LINUX.md)
+- [Windows deployment](doc/DEPLOY_WIN.md)
+- [Linux deployment](doc/DEPLOY_LINUX.md)
 - [Command-line usage](doc/USAGE.md)
