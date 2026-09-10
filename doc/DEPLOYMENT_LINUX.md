@@ -25,7 +25,7 @@ Recommended application directory:
 Default database location:
 
 ```text
-~/.local/share/ghtraffic/ghtraffic.db
+~/.local/share/ghtraffic/github_traffic.db
 ```
 
 Configuration directory:
@@ -79,7 +79,7 @@ cp -R static ~/.local/lib/ghtraffic/
 The default Linux database path is:
 
 ```text
-~/.local/share/ghtraffic/ghtraffic.db
+~/.local/share/ghtraffic/github_traffic.db
 ```
 
 The main `install.py` installer writes this location to `database.path` in `ghtraffic.properties`, initializes the database automatically when it does not already exist, and preserves an existing database during upgrades.
@@ -101,7 +101,7 @@ GHTraffic reads configuration from:
 The normal properties are:
 
 ```text
-database.path=/home/user/.local/share/ghtraffic/ghtraffic.db
+database.path=/home/user/.local/share/ghtraffic/github_traffic.db
 github.token=github_pat_...
 ```
 
