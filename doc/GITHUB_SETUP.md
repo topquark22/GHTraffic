@@ -80,40 +80,63 @@ Treat the token like a password. Do not place it in source files, documentation,
 
 ## 6. Configure GHTraffic
 
-`ghtraffic.py` reads the token from the environment variable:
+GHTraffic stores its token in a local properties file using:
 
 ```text
-GITHUB_TOKEN
+github.token=github_pat_...
 ```
 
-For a temporary Command Prompt test:
+The default Windows properties file is:
 
-```cmd
-set GITHUB_TOKEN=github_pat_...
-python ghtraffic.py --db ghtraffic.db collect
+```text
+%LOCALAPPDATA%\GHTraffic\ghtraffic.properties
 ```
 
-For a temporary PowerShell test:
+The default Linux properties file is:
 
-```powershell
-$env:GITHUB_TOKEN = "github_pat_..."
-python ghtraffic.py --db ghtraffic.db collect
+```text
+~/.config/ghtraffic/ghtraffic.properties
 ```
 
-For a temporary Linux shell test:
+The normal installation command:
 
-```bash
-export GITHUB_TOKEN='github_pat_...'
-python3 ghtraffic.py --db ghtraffic.db collect
+```text
+python install.py
 ```
 
-Do not commit a script containing the actual token.
+prompts for the GitHub token when no token is already configured. The prompt does not echo the token to the terminal. If a properties file containing `github.token` already exists, the installer preserves it rather than silently replacing the credential.
 
-When `install.py` is run and `GITHUB_TOKEN` is available only in the current shell, the installer offers to persist it for scheduled collection. On Windows it can save the token in the current user's environment. On Linux it can save the token in `~/.config/ghtraffic/environment` with user-only permissions. Existing credential configuration is preserved and is not silently replaced.
+On Linux, the installer restricts the properties file to the current user with mode `0600`. On Windows, the file is stored under the current user's Local AppData directory and inherits that directory's access controls.
 
-## 7. Verify the token
+The collector reads the properties file directly. No `GITHUB_TOKEN` environment variable is required for interactive or scheduled collection.
 
-Before configuring scheduled execution, run GHTraffic manually with the token set and verify that it can:
+## 7. Manual configuration
+
+The properties file can also be created or edited manually.
+
+On Windows:
+
+```text
+%LOCALAPPDATA%\GHTraffic\ghtraffic.properties
+```
+
+On Linux:
+
+```text
+~/.config/ghtraffic/ghtraffic.properties
+```
+
+The required property is:
+
+```text
+github.token=github_pat_...
+```
+
+Do not commit the properties file or copy its contents into documentation or shell commands.
+
+## 8. Verify the token
+
+Run GHTraffic manually and verify that it can:
 
 1. authenticate as the expected GitHub user;
 2. enumerate the user's repositories;
@@ -123,31 +146,19 @@ Before configuring scheduled execution, run GHTraffic manually with the token se
 For example:
 
 ```cmd
-python ghtraffic.py --db ghtraffic.db collect
+python ghtraffic.py collect
 ```
 
 A permissions error from the traffic endpoints usually indicates that the token does not have **Administration: Read-only** access to the affected repository.
 
-## 8. Scheduled collection
-
-The token must be available to the scheduled collector without requiring an interactive prompt.
-
-Do not put the token directly into a Task Scheduler or systemd command line because command-line arguments and service definitions can be exposed through process inspection or configuration files.
-
-On Windows, the default installer configuration uses the current user's environment and runs the collector only while that user is logged on. This avoids storing the user's Windows password in Task Scheduler.
-
-On Linux, the systemd user service reads the token from:
-
-```text
-~/.config/ghtraffic/environment
-```
+Because scheduled collection reads the same properties file, no separate Task Scheduler or systemd credential configuration is required.
 
 ## 9. Token rotation
 
 If the token expires, is revoked, or is suspected to have been exposed:
 
 1. generate a replacement fine-grained token with the same repository access and permissions;
-2. update the stored `GITHUB_TOKEN` used by scheduled collection;
+2. replace the `github.token` value in `ghtraffic.properties`;
 3. test GHTraffic manually;
 4. revoke the old token in GitHub.
 
