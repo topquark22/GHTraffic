@@ -253,13 +253,14 @@ def register_windows_task(name, xml):
             pass
 
 
-def install_windows_tasks(app_dir):
+def install_windows_tasks():
     user_id = windows_user_id()
     python = Path(sys.executable)
     pythonw = python.with_name("pythonw.exe")
     if not pythonw.exists():
         raise RuntimeError(f"pythonw.exe was not found next to python.exe: {pythonw}")
 
+    task_app_dir = r"%LOCALAPPDATA%\GHTraffic"
     start = datetime.now().astimezone() + timedelta(minutes=5)
     start_boundary = start.isoformat(timespec="seconds")
 
@@ -279,15 +280,15 @@ def install_windows_tasks(app_dir):
     collector_xml = windows_task_xml(
         user_id,
         pythonw,
-        f'"{app_dir / "ghtraffic.py"}" collect',
-        app_dir,
+        f'"{task_app_dir}\\ghtraffic.py" collect',
+        task_app_dir,
         collector_trigger,
     )
     ui_xml = windows_task_xml(
         user_id,
         pythonw,
-        f'"{app_dir / "ghtraffic_ui.py"}"',
-        app_dir,
+        f'"{task_app_dir}\\ghtraffic_ui.py"',
+        task_app_dir,
         ui_trigger,
     )
 
@@ -376,7 +377,7 @@ def main():
         install_files(app_dir)
         db_path = configure_properties(properties_path, default_db_path)
         initialize_database(db_path)
-        install_windows_tasks(app_dir)
+        install_windows_tasks()
         run(["schtasks.exe", "/Run", "/TN", "GHTraffic UI"])
     elif sys.platform.startswith("linux"):
         app_dir, default_db_path, properties_path = linux_paths()
