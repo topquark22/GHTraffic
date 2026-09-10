@@ -13,15 +13,15 @@ set "DB_FILE=%~2"
 
 :resolve_db
 if defined DB_FILE goto have_db
-if defined GHTRAFFIC_DB (
-  set "DB_FILE=%GHTRAFFIC_DB%"
-  goto have_db
-)
 if not defined LOCALAPPDATA (
   echo Error: LOCALAPPDATA is not set 1>&2
   exit /b 1
 )
-set "DB_FILE=%LOCALAPPDATA%\GHTraffic\ghtraffic.db"
+set "PROPERTIES_FILE=%LOCALAPPDATA%\GHTraffic\ghtraffic.properties"
+if exist "%PROPERTIES_FILE%" (
+  for /f "tokens=1,* delims==" %%A in ('findstr /B /C:"database.path=" "%PROPERTIES_FILE%"') do set "DB_FILE=%%B"
+)
+if not defined DB_FILE set "DB_FILE=%LOCALAPPDATA%\GHTraffic\ghtraffic.db"
 
 :have_db
 set "DDL_FILE=%~dp0ddl.sql"
