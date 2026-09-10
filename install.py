@@ -128,7 +128,7 @@ def configure_credentials(properties_path):
     token = properties.get("github.token")
     if token:
         print(f"Preserving existing credentials: {properties_path}")
-        return True
+        return
 
     print()
     print("GHTraffic needs a GitHub access token to collect traffic statistics.")
@@ -136,15 +136,14 @@ def configure_credentials(properties_path):
     print(properties_path)
     token = getpass.getpass("GitHub access token (leave blank to skip): ").strip()
     if not token:
-        print("No token supplied; initial and scheduled collection will not authenticate yet.")
-        return False
+        print("No token supplied; scheduled collection will not authenticate yet.")
+        return
 
     properties_path.parent.mkdir(parents=True, exist_ok=True)
     properties_path.write_text(f"github.token={token}\n", encoding="utf-8")
     if sys.platform != "win32":
         properties_path.chmod(0o600)
     print(f"Saved credentials: {properties_path}")
-    return True
 
 
 def windows_user_id():
@@ -257,7 +256,7 @@ def install_windows_tasks(app_dir):
 
     collector_xml = windows_task_xml(
         user_id,
-        python,
+        pythonw,
         f'"{app_dir / "ghtraffic.py"}" collect',
         app_dir,
         collector_trigger,
@@ -340,17 +339,6 @@ WantedBy=default.target
     run(["systemctl", "--user", "restart", "ghtraffic-ui.service"])
 
 
-def run_initial_collection(app_dir, credentials_available):
-    if not credentials_available:
-        print("No GitHub token is configured; skipping initial collection.")
-        return
-
-    print("Running initial collection...")
-    result = subprocess.run([sys.executable, str(app_dir / "ghtraffic.py"), "collect"])
-    if result.returncode != 0:
-        print("Initial collection failed; scheduled collection is still configured.")
-
-
 def main():
     if sys.platform == "cygwin":
         raise RuntimeError(
@@ -365,17 +353,15 @@ def main():
         app_dir, db_path, properties_path = windows_paths()
         install_files(app_dir)
         initialize_database(db_path)
-        credentials_available = configure_credentials(properties_path)
+        configure_credentials(properties_path)
         install_windows_tasks(app_dir)
-        run_initial_collection(app_dir, credentials_available)
         run(["schtasks.exe", "/Run", "/TN", "GHTraffic UI"])
     elif sys.platform.startswith("linux"):
         app_dir, db_path, properties_path = linux_paths()
         install_files(app_dir)
         initialize_database(db_path)
-        credentials_available = configure_credentials(properties_path)
+        configure_credentials(properties_path)
         install_linux_units(app_dir)
-        run_initial_collection(app_dir, credentials_available)
     else:
         raise RuntimeError(f"unsupported operating system: {sys.platform}")
 
