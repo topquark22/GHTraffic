@@ -161,6 +161,12 @@ The database location property shall be named:
 database.path
 ```
 
+The default database filename shall be:
+
+```text
+github_traffic.db
+```
+
 On Windows, the default properties file location shall be:
 
 ```text
@@ -223,7 +229,7 @@ The installer shall:
 
 - create the appropriate application, data, and configuration directories;
 - install or update `ghtraffic.py`, `ghtraffic_ui.py`, and required static assets;
-- configure `database.path` in `ghtraffic.properties` when it is not already configured;
+- configure `database.path` in `ghtraffic.properties` when it is not already configured, using `github_traffic.db` as the default database filename;
 - initialize the configured SQLite database from `ddl.sql` when the database does not already exist;
 - preserve an existing database during upgrades;
 - preserve an existing `ghtraffic.properties` file and existing property values during upgrades;
