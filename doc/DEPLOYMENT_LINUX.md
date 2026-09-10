@@ -51,6 +51,12 @@ The deployed application directory should contain:
         favicon.ico
 ```
 
+The GitHub credential is stored separately in:
+
+```text
+~/.config/ghtraffic/ghtraffic.properties
+```
+
 Create the required directories:
 
 ```bash
@@ -95,37 +101,26 @@ To initialize another database explicitly:
 GHTraffic reads the GitHub access token from:
 
 ```text
-GITHUB_TOKEN
+~/.config/ghtraffic/ghtraffic.properties
 ```
 
-For an interactive test:
-
-```bash
-export GITHUB_TOKEN='github_pat_...'
-python3 ~/.local/lib/ghtraffic/ghtraffic.py collect
-```
-
-For unattended systemd execution, store the token in a private environment file:
+The required property is:
 
 ```text
-~/.config/ghtraffic/environment
-```
-
-with contents:
-
-```text
-GITHUB_TOKEN=github_pat_...
+github.token=github_pat_...
 ```
 
 Restrict access to the file:
 
 ```bash
-chmod 600 ~/.config/ghtraffic/environment
+chmod 600 ~/.config/ghtraffic/ghtraffic.properties
 ```
 
-When `install.py` is run with `GITHUB_TOKEN` set in the current shell and no existing environment file, it offers to create this file. Existing credential configuration is preserved.
+When `install.py` is run and no token is already configured, it prompts for the token without echoing it to the terminal and creates this file automatically. Existing credential configuration is preserved.
 
-Do not commit this file or place the token in the systemd unit itself.
+No `GITHUB_TOKEN` environment variable or systemd environment file is required.
+
+Do not commit the properties file or place the token in a systemd unit.
 
 ## Test the collector
 
@@ -163,7 +158,6 @@ Description=GHTraffic repository traffic collector
 
 [Service]
 Type=oneshot
-EnvironmentFile=%h/.config/ghtraffic/environment
 WorkingDirectory=%h/.local/lib/ghtraffic
 ExecStart=/usr/bin/python3 %h/.local/lib/ghtraffic/ghtraffic.py collect
 ```
@@ -301,7 +295,7 @@ The simplest update procedure is to run the current installer again:
 python3 install.py
 ```
 
-The installer replaces the application and static files, preserves the existing database and credential configuration, updates the systemd user units, and restarts the UI.
+The installer replaces the application and static files, preserves the existing database and `ghtraffic.properties`, updates the systemd user units, and restarts the UI.
 
 For a manual update, copy the current application files again:
 
