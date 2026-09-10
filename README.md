@@ -4,6 +4,18 @@ GHTraffic collects GitHub repository traffic statistics and stores them in a loc
 
 The current version monitors all non-fork repositories owned by the authenticated GitHub user and provides both command-line reporting and a local web interface for views, clones, and referrer traffic.
 
+## Installation
+
+After configuring a GitHub access token as described in [GitHub authentication](doc/GITHUB_SETUP.md), run:
+
+```text
+python install.py
+```
+
+The installer supports Windows and Linux. It installs the application, initializes the database when necessary, configures hourly collection and UI startup, preserves an existing database during upgrades, and starts the local web interface.
+
+For manual installation and platform-specific details, see the deployment documents below.
+
 ## Documentation
 
 - [Setup](doc/SETUP.md)
