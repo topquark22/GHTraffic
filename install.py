@@ -8,7 +8,6 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
-from datetime import datetime, timedelta
 from pathlib import Path
 
 
@@ -261,16 +260,14 @@ def install_windows_tasks():
         raise RuntimeError(f"pythonw.exe was not found next to python.exe: {pythonw}")
 
     task_app_dir = r"%LOCALAPPDATA%\GHTraffic"
-    start = datetime.now().astimezone() + timedelta(minutes=2)
-    start_boundary = start.isoformat(timespec="seconds")
 
-    collector_trigger = f'''<TimeTrigger>
-      <StartBoundary>{start_boundary}</StartBoundary>
+    collector_trigger = '''<RegistrationTrigger>
       <Enabled>true</Enabled>
       <Repetition>
         <Interval>PT1H</Interval>
       </Repetition>
-    </TimeTrigger>'''
+      <Delay>PT2M</Delay>
+    </RegistrationTrigger>'''
 
     ui_trigger = f'''<LogonTrigger>
       <Enabled>true</Enabled>
