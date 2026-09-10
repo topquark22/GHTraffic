@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 
-DB_FILENAME = "ghtraffic.db"
+DB_FILENAME = "github_traffic.db"
 PROPERTIES_FILENAME = "ghtraffic.properties"
 SOURCE_DIR = Path(__file__).resolve().parent
 
