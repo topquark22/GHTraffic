@@ -165,7 +165,7 @@ def configure_credentials(properties_path):
 
 def windows_user_sid():
     result = subprocess.run(
-        ["whoami", "/user", "/fo", "csv", "/nh"],
+        ["whoami.exe", "/user", "/fo", "csv", "/nh"],
         check=True,
         capture_output=True,
         text=True,
