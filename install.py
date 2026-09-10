@@ -9,7 +9,7 @@ import subprocess
 import sys
 import tempfile
 from datetime import datetime, timedelta
-from pathlib import Path, PureWindowsPath
+from pathlib import Path
 
 
 DB_FILENAME = "ghtraffic.db"
@@ -46,36 +46,12 @@ def verify_python():
     print(f"SQLite: {sqlite3.sqlite_version}")
 
 
-def cygwin_posix_path(path):
-    windows_path = PureWindowsPath(str(path))
-    drive = windows_path.drive.rstrip(":").lower()
-    if not drive:
-        raise RuntimeError(f"Windows path has no drive letter: {path}")
-
-    parts = windows_path.parts[1:]
-    return Path("/cygdrive") / drive / Path(*parts)
-
-
-def cygwin_windows_path(path):
-    path = Path(path)
-    parts = path.parts
-    if len(parts) >= 4 and parts[0] == "/" and parts[1] == "cygdrive":
-        drive = parts[2].upper()
-        return str(PureWindowsPath(f"{drive}:/", *parts[3:]))
-
-    raise RuntimeError(f"cannot convert Cygwin path to Windows path: {path}")
-
-
 def windows_paths():
     local_app_data = os.environ.get("LOCALAPPDATA")
     if not local_app_data:
         raise RuntimeError("LOCALAPPDATA is not set")
 
-    if sys.platform == "cygwin":
-        app_dir = cygwin_posix_path(local_app_data) / "GHTraffic"
-    else:
-        app_dir = Path(local_app_data) / "GHTraffic"
-
+    app_dir = Path(local_app_data) / "GHTraffic"
     return app_dir, app_dir / DB_FILENAME, app_dir / PROPERTIES_FILENAME
 
 
@@ -165,14 +141,14 @@ def configure_credentials(properties_path):
 
     properties_path.parent.mkdir(parents=True, exist_ok=True)
     properties_path.write_text(f"github.token={token}\n", encoding="utf-8")
-    if sys.platform != "win32" and sys.platform != "cygwin":
+    if sys.platform != "win32":
         properties_path.chmod(0o600)
     print(f"Saved credentials: {properties_path}")
     return True
 
 
 def windows_user_id():
-    username = os.environ.get("USERNAME") or os.environ.get("USER")
+    username = os.environ.get("USERNAME")
     if not username:
         raise RuntimeError("could not determine the current Windows user")
 
@@ -180,42 +156,6 @@ def windows_user_id():
     if domain:
         return f"{domain}\\{username}"
     return username
-
-
-def native_windows_python():
-    if sys.platform == "win32":
-        return str(Path(sys.executable))
-
-    launcher = shutil.which("py.exe")
-    if launcher:
-        result = subprocess.run(
-            [launcher, "-3", "-c", "import sys; print(sys.executable)"],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-        python = result.stdout.strip()
-        if python:
-            return python
-
-    result = subprocess.run(
-        ["where.exe", "python"],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    candidates = [line.strip() for line in result.stdout.splitlines() if line.strip()]
-    for candidate in candidates:
-        if "WindowsApps" not in candidate:
-            return candidate
-
-    raise RuntimeError("native Windows python.exe was not found")
-
-
-def native_windows_path(path):
-    if sys.platform == "cygwin":
-        return cygwin_windows_path(path)
-    return str(path)
 
 
 def windows_task_xml(user_id, command, arguments, working_directory, trigger_xml):
@@ -263,9 +203,8 @@ def stop_windows_task(name):
 def register_windows_task(name, xml):
     xml_path = Path(tempfile.gettempdir()) / f"{name.replace(' ', '_')}.xml"
     xml_path.write_text(xml, encoding="utf-16")
-    native_xml_path = native_windows_path(xml_path)
     try:
-        run(["schtasks.exe", "/Create", "/TN", name, "/XML", native_xml_path, "/F"])
+        run(["schtasks.exe", "/Create", "/TN", name, "/XML", str(xml_path), "/F"])
     finally:
         try:
             xml_path.unlink()
@@ -275,10 +214,7 @@ def register_windows_task(name, xml):
 
 def install_windows_tasks(app_dir):
     user_id = windows_user_id()
-    python = native_windows_python()
-    native_app_dir = native_windows_path(app_dir)
-    native_collector = native_windows_path(app_dir / "ghtraffic.py")
-    native_ui = native_windows_path(app_dir / "ghtraffic_ui.py")
+    python = Path(sys.executable)
     start = datetime.now().astimezone() + timedelta(minutes=5)
     start_boundary = start.isoformat(timespec="seconds")
 
@@ -298,15 +234,15 @@ def install_windows_tasks(app_dir):
     collector_xml = windows_task_xml(
         user_id,
         python,
-        f'"{native_collector}" collect',
-        native_app_dir,
+        f'"{app_dir / "ghtraffic.py"}" collect',
+        app_dir,
         collector_trigger,
     )
     ui_xml = windows_task_xml(
         user_id,
         python,
-        f'"{native_ui}"',
-        native_app_dir,
+        f'"{app_dir / "ghtraffic_ui.py"}"',
+        app_dir,
         ui_trigger,
     )
 
@@ -386,25 +322,22 @@ def run_initial_collection(app_dir, credentials_available):
         return
 
     print("Running initial collection...")
-    if sys.platform == "cygwin":
-        command = [
-            native_windows_python(),
-            native_windows_path(app_dir / "ghtraffic.py"),
-            "collect",
-        ]
-    else:
-        command = [sys.executable, str(app_dir / "ghtraffic.py"), "collect"]
-
-    result = subprocess.run(command)
+    result = subprocess.run([sys.executable, str(app_dir / "ghtraffic.py"), "collect"])
     if result.returncode != 0:
         print("Initial collection failed; scheduled collection is still configured.")
 
 
 def main():
+    if sys.platform == "cygwin":
+        raise RuntimeError(
+            "GHTraffic installation on Windows must be run from Windows Command Prompt. "
+            "Open cmd.exe, change to the GHTraffic source directory, and run: python install.py"
+        )
+
     verify_python()
     verify_sources()
 
-    if sys.platform in ("win32", "cygwin"):
+    if sys.platform == "win32":
         app_dir, db_path, properties_path = windows_paths()
         install_files(app_dir)
         initialize_database(db_path)
