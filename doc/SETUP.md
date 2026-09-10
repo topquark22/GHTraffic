@@ -2,9 +2,10 @@
 
 This document describes the Windows setup for GHTraffic.
 
-For the normal installation path, run:
+Run the installer from native Windows Command Prompt (`cmd.exe`), not from Cygwin:
 
 ```cmd
+cd C:\path\to\GHTraffic
 python install.py
 ```
 
@@ -34,7 +35,7 @@ For the current development machine, the native interpreter is:
 %LOCALAPPDATA%\Python\bin\python.exe
 ```
 
-If `install.py` is launched from Cygwin, it still performs a native Windows installation and locates a native Windows `python.exe` for Task Scheduler.
+Cygwin is not a supported environment for `install.py`. If the installer is launched from Cygwin, it exits with instructions to rerun it from Windows Command Prompt.
 
 ## 2. SQLite
 
