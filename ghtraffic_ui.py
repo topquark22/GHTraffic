@@ -203,6 +203,13 @@ INDEX_HTML = """<!doctype html>
     <tbody></tbody>
   </table>
 
+  <br/><br/>
+  <p style="text-align: center;">
+    <small>Copyright 2026, 
+      <a href="https://github.com/topquark22/GHTraffic/" target="_blank">topquark22</a>
+    </small>
+  </p>
+  
   <script>
     const pageTitle = document.getElementById('pageTitle');
     const repositorySelect = document.getElementById('repository');
