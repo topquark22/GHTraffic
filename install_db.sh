@@ -47,18 +47,37 @@ platform="$(uname -s)"
 
 if [[ -n "$db_override" ]]; then
   db_file="$db_override"
-elif [[ -n "${GHTRAFFIC_DB:-}" ]]; then
-  db_file="$GHTRAFFIC_DB"
 elif [[ "$platform" == CYGWIN* || "$platform" == MINGW* || "$platform" == MSYS* ]]; then
   if [[ -z "${LOCALAPPDATA:-}" ]]; then
     echo "Error: LOCALAPPDATA is not set" >&2
     exit 1
   fi
 
-  db_file="$LOCALAPPDATA/GHTraffic/ghtraffic.db"
+  properties_file="$LOCALAPPDATA/GHTraffic/ghtraffic.properties"
+  if [[ -f "$properties_file" ]]; then
+    db_file="$(sed -n 's/^database\.path=//p' "$properties_file" | head -n 1)"
+  else
+    db_file=""
+  fi
+
+  if [[ -z "$db_file" ]]; then
+    db_file="$LOCALAPPDATA/GHTraffic/ghtraffic.db"
+  elif command -v cygpath >/dev/null 2>&1; then
+    db_file="$(cygpath -u "$db_file")"
+  fi
 else
-  data_home="${XDG_DATA_HOME:-$HOME/.local/share}"
-  db_file="$data_home/ghtraffic/ghtraffic.db"
+  config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
+  properties_file="$config_home/ghtraffic/ghtraffic.properties"
+  if [[ -f "$properties_file" ]]; then
+    db_file="$(sed -n 's/^database\.path=//p' "$properties_file" | head -n 1)"
+  else
+    db_file=""
+  fi
+
+  if [[ -z "$db_file" ]]; then
+    data_home="${XDG_DATA_HOME:-$HOME/.local/share}"
+    db_file="$data_home/ghtraffic/ghtraffic.db"
+  fi
 fi
 
 if [[ "$platform" == CYGWIN* || "$platform" == MINGW* || "$platform" == MSYS* ]]; then
