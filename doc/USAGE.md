@@ -2,11 +2,7 @@
 
 GHTraffic provides three command-line commands through `ghtraffic.py`: `collect`, `show`, and `referrers`.
 
-By default, the program uses the platform's standard GHTraffic database location. On Windows this is:
-
-```text
-%LOCALAPPDATA%\GHTraffic\ghtraffic.db
-```
+By default, the program reads the SQLite database location from `database.path` in `ghtraffic.properties`.
 
 ## Collect traffic
 
@@ -22,7 +18,7 @@ The `collect` command connects to GitHub using the access token stored as `githu
 - clones and unique cloners; and
 - referrer traffic.
 
-The collected data is written to the local SQLite database. Existing daily traffic records are updated when GitHub returns revised values, so repeated collection does not create duplicate daily records.
+The collected data is written to the local SQLite database configured by `database.path`. Existing daily traffic records are updated when GitHub returns revised values, so repeated collection does not create duplicate daily records.
 
 See [GITHUB_SETUP.md](GITHUB_SETUP.md) for GitHub authentication setup.
 
@@ -73,7 +69,13 @@ GitHub supplies referrer statistics as a rolling aggregate rather than daily his
 
 ## Use another database
 
-The `--db` option selects an explicit SQLite database file and must appear before the command:
+The normal database path is configured in `ghtraffic.properties`:
+
+```text
+database.path=/path/to/ghtraffic.db
+```
+
+The `--db` option selects an explicit SQLite database file for a single command and must appear before the command:
 
 ```bash
 python ghtraffic.py --db ./ghtraffic.db show
@@ -82,7 +84,7 @@ python ghtraffic.py --db ./ghtraffic.db referrers
 python ghtraffic.py --db ./ghtraffic.db collect
 ```
 
-An alternate default database can also be supplied through the `GHTRAFFIC_DB` environment variable. The `--db` command-line option takes precedence over `GHTRAFFIC_DB` and the platform default.
+The `--db` command-line option takes precedence over `database.path` and is intended primarily for testing and manual use.
 
 ## Help
 
