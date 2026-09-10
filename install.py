@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 
-import csv
 import getpass
 import html
-import io
 import os
 import shutil
 import sqlite3
@@ -173,17 +171,15 @@ def configure_credentials(properties_path):
     return True
 
 
-def windows_user_sid():
-    result = subprocess.run(
-        ["whoami.exe", "/user", "/fo", "csv", "/nh"],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    row = next(csv.reader(io.StringIO(result.stdout)))
-    if len(row) < 2 or not row[1]:
-        raise RuntimeError("could not determine the current Windows user SID")
-    return row[1]
+def windows_user_id():
+    username = os.environ.get("USERNAME") or os.environ.get("USER")
+    if not username:
+        raise RuntimeError("could not determine the current Windows user")
+
+    domain = os.environ.get("USERDOMAIN")
+    if domain:
+        return f"{domain}\\{username}"
+    return username
 
 
 def native_windows_python():
@@ -222,7 +218,7 @@ def native_windows_path(path):
     return str(path)
 
 
-def windows_task_xml(user_sid, command, arguments, working_directory, trigger_xml):
+def windows_task_xml(user_id, command, arguments, working_directory, trigger_xml):
     return f'''<?xml version="1.0" encoding="UTF-16"?>
 <Task version="1.4" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
   <Triggers>
@@ -230,7 +226,7 @@ def windows_task_xml(user_sid, command, arguments, working_directory, trigger_xm
   </Triggers>
   <Principals>
     <Principal id="Author">
-      <UserId>{html.escape(user_sid)}</UserId>
+      <UserId>{html.escape(user_id)}</UserId>
       <LogonType>InteractiveToken</LogonType>
       <RunLevel>LeastPrivilege</RunLevel>
     </Principal>
@@ -278,7 +274,7 @@ def register_windows_task(name, xml):
 
 
 def install_windows_tasks(app_dir):
-    user_sid = windows_user_sid()
+    user_id = windows_user_id()
     python = native_windows_python()
     native_app_dir = native_windows_path(app_dir)
     native_collector = native_windows_path(app_dir / "ghtraffic.py")
@@ -296,18 +292,18 @@ def install_windows_tasks(app_dir):
 
     ui_trigger = f'''<LogonTrigger>
       <Enabled>true</Enabled>
-      <UserId>{html.escape(user_sid)}</UserId>
+      <UserId>{html.escape(user_id)}</UserId>
     </LogonTrigger>'''
 
     collector_xml = windows_task_xml(
-        user_sid,
+        user_id,
         python,
         f'"{native_collector}" collect',
         native_app_dir,
         collector_trigger,
     )
     ui_xml = windows_task_xml(
-        user_sid,
+        user_id,
         python,
         f'"{native_ui}"',
         native_app_dir,
