@@ -18,7 +18,7 @@ For manual installation and platform-specific details, see the deployment docume
 
 ## Usage
 
-The ]interface](http://localhost:8501) is at `http://localhost:8501`
+The [interface](http://localhost:8501) is at `http://localhost:8501`
 
 ## Documentation
 
