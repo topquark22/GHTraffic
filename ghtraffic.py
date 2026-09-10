@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import sqlite3
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -13,6 +14,7 @@ from urllib.request import Request, urlopen
 
 
 DB_FILENAME = "ghtraffic.db"
+PROPERTIES_FILENAME = "ghtraffic.properties"
 GITHUB_API = "https://api.github.com"
 REQUIRED_TABLES = {
     "repositories",
@@ -22,23 +24,76 @@ REQUIRED_TABLES = {
 }
 
 
+def windows_app_dir():
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    if not local_app_data:
+        raise RuntimeError("LOCALAPPDATA is not set")
+
+    if sys.platform == "cygwin":
+        result = subprocess.run(
+            ["cygpath", "-u", local_app_data],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        return Path(result.stdout.strip()) / "GHTraffic"
+
+    return Path(local_app_data) / "GHTraffic"
+
+
 def default_db_path():
     override = os.environ.get("GHTRAFFIC_DB")
     if override:
         return Path(override).expanduser()
 
-    if sys.platform == "win32":
-        local_app_data = os.environ.get("LOCALAPPDATA")
-        if not local_app_data:
-            raise RuntimeError("LOCALAPPDATA is not set")
-
-        return Path(local_app_data) / "GHTraffic" / DB_FILENAME
+    if sys.platform in ("win32", "cygwin"):
+        return windows_app_dir() / DB_FILENAME
 
     data_home = os.environ.get("XDG_DATA_HOME")
     if data_home:
         return Path(data_home).expanduser() / "ghtraffic" / DB_FILENAME
 
     return Path.home() / ".local" / "share" / "ghtraffic" / DB_FILENAME
+
+
+def default_properties_path():
+    if sys.platform in ("win32", "cygwin"):
+        return windows_app_dir() / PROPERTIES_FILENAME
+
+    config_home = os.environ.get("XDG_CONFIG_HOME")
+    if config_home:
+        return Path(config_home).expanduser() / "ghtraffic" / PROPERTIES_FILENAME
+
+    return Path.home() / ".config" / "ghtraffic" / PROPERTIES_FILENAME
+
+
+def load_properties(path):
+    if not path.exists():
+        raise RuntimeError(f"properties file does not exist: {path}")
+
+    properties = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or line.startswith("!"):
+            continue
+        if "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        properties[key.strip()] = value.strip()
+
+    return properties
+
+
+def github_token():
+    properties_path = default_properties_path()
+    properties = load_properties(properties_path)
+    token = properties.get("github.token")
+    if not token:
+        raise RuntimeError(
+            f"github.token is not set in properties file: {properties_path}"
+        )
+
+    return token
 
 
 def connect_db(db_path):
@@ -306,9 +361,7 @@ def update_referrers(connection, repository_id, referrers, collected_date):
 
 
 def collect(connection):
-    token = os.environ.get("GITHUB_TOKEN")
-    if not token:
-        raise RuntimeError("GITHUB_TOKEN is not set")
+    token = github_token()
 
     user = github_get("/user", token)
     repositories = get_repositories(token)
@@ -518,7 +571,7 @@ def main():
                 return show(connection, args.days)
             if args.command == "referrers":
                 return show_referrers(connection)
-    except (OSError, sqlite3.Error, RuntimeError) as error:
+    except (OSError, sqlite3.Error, RuntimeError, subprocess.CalledProcessError) as error:
         print(f"Error: {error}", file=sys.stderr)
         return 1
 
