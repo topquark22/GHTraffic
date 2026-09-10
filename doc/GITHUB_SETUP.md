@@ -141,7 +141,7 @@ Run GHTraffic manually and verify that it can:
 1. authenticate as the expected GitHub user;
 2. enumerate the user's repositories;
 3. retrieve traffic data for the monitored repositories; and
-4. update `ghtraffic.db` successfully.
+4. update `github_traffic.db` successfully.
 
 For example:
 
