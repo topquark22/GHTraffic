@@ -41,7 +41,7 @@ ghtraffic.db
 On Windows, its default location is:
 
 ```text
-%LOCALAPPDATA%\GHTraffic\githubtraffic.db
+%LOCALAPPDATA%\GHTraffic\ghtraffic.db
 ```
 
 Create the directory if it does not already exist:
@@ -70,19 +70,27 @@ The live database should not be stored in or committed to the GHTraffic source r
 
 ## 4. Initialize the database
 
-Run:
+From Command Prompt, run:
 
-```bash
-./install_db.sh
+```cmd
+install_db.bat
 ```
+
+The Windows installer uses Python's built-in `sqlite3` module, so neither Cygwin nor the standalone SQLite command-line program is required.
 
 To initialize an alternate database for testing:
 
-```bash
-./install_db.sh -d ./ghtraffic.db
+```cmd
+install_db.bat -d .\ghtraffic.db
 ```
 
-The installer expects the target database not to exist already. It runs `ddl.sql` to create the schema.
+`GHTRAFFIC_DB` is honored when `-d` is not supplied. Otherwise the installer creates the database at the standard Windows location:
+
+```text
+%LOCALAPPDATA%\GHTraffic\ghtraffic.db
+```
+
+The installer runs `ddl.sql` to create the schema.
 
 ## 5. Windows scheduled task
 
