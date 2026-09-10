@@ -48,13 +48,13 @@ No Cygwin SQLite package is required.
 The database file is normally named:
 
 ```text
-ghtraffic.db
+github_traffic.db
 ```
 
 On Windows, the installer initially configures:
 
 ```text
-%LOCALAPPDATA%\GHTraffic\ghtraffic.db
+%LOCALAPPDATA%\GHTraffic\github_traffic.db
 ```
 
 The configured database location is stored in:
@@ -66,13 +66,13 @@ The configured database location is stored in:
 using the property:
 
 ```text
-database.path=C:\Users\name\AppData\Local\GHTraffic\ghtraffic.db
+database.path=C:\Users\name\AppData\Local\GHTraffic\github_traffic.db
 ```
 
 Both the collector and the UI read the database location from this property. The `--db` command-line option overrides it for a single invocation and is useful for local testing:
 
 ```cmd
-python ghtraffic.py --db ghtraffic.db show
+python ghtraffic.py --db github_traffic.db show
 ```
 
 The live database should not be stored in or committed to the GHTraffic source repository.
