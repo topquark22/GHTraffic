@@ -204,7 +204,27 @@ def register_windows_task(name, xml):
     xml_path = Path(tempfile.gettempdir()) / f"{name.replace(' ', '_')}.xml"
     xml_path.write_text(xml, encoding="utf-16")
     try:
-        run(["schtasks.exe", "/Create", "/TN", name, "/XML", str(xml_path), "/F"])
+        print("+", " ".join([
+            "schtasks.exe", "/Create", "/TN", name, "/XML", str(xml_path), "/F"
+        ]))
+        result = subprocess.run(
+            ["schtasks.exe", "/Create", "/TN", name, "/XML", str(xml_path), "/F"],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            message = (result.stderr or result.stdout).strip()
+            if "Access is denied" in message:
+                raise RuntimeError(
+                    f"Windows would not replace the existing scheduled task '{name}'. "
+                    "It was probably created previously with administrator privileges. "
+                    "Delete that old task once from an Administrator Command Prompt with: "
+                    f'schtasks /Delete /TN "{name}" /F  '
+                    "Then return to a normal Command Prompt and run: python install.py"
+                )
+            raise RuntimeError(
+                f"could not create Windows scheduled task '{name}': {message}"
+            )
     finally:
         try:
             xml_path.unlink()
