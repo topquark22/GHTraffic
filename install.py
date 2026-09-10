@@ -123,27 +123,49 @@ def read_properties(path):
     return properties
 
 
-def configure_credentials(properties_path):
+def append_property(path, key, value):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    prefix = ""
+    if path.exists() and path.stat().st_size > 0:
+        content = path.read_text(encoding="utf-8")
+        if not content.endswith("\n"):
+            prefix = "\n"
+
+    with path.open("a", encoding="utf-8") as stream:
+        stream.write(f"{prefix}{key}={value}\n")
+
+
+def configure_properties(properties_path, default_db_path):
     properties = read_properties(properties_path)
+
+    database = properties.get("database.path")
+    if database:
+        db_path = Path(database).expanduser()
+        print(f"Preserving configured database path: {db_path}")
+    else:
+        db_path = default_db_path
+        append_property(properties_path, "database.path", db_path)
+        print(f"Saved database path: {db_path}")
+
     token = properties.get("github.token")
     if token:
         print(f"Preserving existing credentials: {properties_path}")
-        return
+    else:
+        print()
+        print("GHTraffic needs a GitHub access token to collect traffic statistics.")
+        print("The token will be stored only in the local properties file:")
+        print(properties_path)
+        token = getpass.getpass("GitHub access token (leave blank to skip): ").strip()
+        if not token:
+            print("No token supplied; scheduled collection will not authenticate yet.")
+        else:
+            append_property(properties_path, "github.token", token)
+            print(f"Saved credentials: {properties_path}")
 
-    print()
-    print("GHTraffic needs a GitHub access token to collect traffic statistics.")
-    print("The token will be stored only in the local properties file:")
-    print(properties_path)
-    token = getpass.getpass("GitHub access token (leave blank to skip): ").strip()
-    if not token:
-        print("No token supplied; scheduled collection will not authenticate yet.")
-        return
-
-    properties_path.parent.mkdir(parents=True, exist_ok=True)
-    properties_path.write_text(f"github.token={token}\n", encoding="utf-8")
-    if sys.platform != "win32":
+    if sys.platform != "win32" and properties_path.exists():
         properties_path.chmod(0o600)
-    print(f"Saved credentials: {properties_path}")
+
+    return db_path
 
 
 def windows_user_id():
@@ -350,17 +372,17 @@ def main():
     verify_sources()
 
     if sys.platform == "win32":
-        app_dir, db_path, properties_path = windows_paths()
+        app_dir, default_db_path, properties_path = windows_paths()
         install_files(app_dir)
+        db_path = configure_properties(properties_path, default_db_path)
         initialize_database(db_path)
-        configure_credentials(properties_path)
         install_windows_tasks(app_dir)
         run(["schtasks.exe", "/Run", "/TN", "GHTraffic UI"])
     elif sys.platform.startswith("linux"):
-        app_dir, db_path, properties_path = linux_paths()
+        app_dir, default_db_path, properties_path = linux_paths()
         install_files(app_dir)
+        db_path = configure_properties(properties_path, default_db_path)
         initialize_database(db_path)
-        configure_credentials(properties_path)
         install_linux_units(app_dir)
     else:
         raise RuntimeError(f"unsupported operating system: {sys.platform}")
