@@ -90,49 +90,64 @@ For a temporary Command Prompt test:
 
 ```cmd
 set GITHUB_TOKEN=github_pat_...
-python ghtraffic.py --db githubtraffic.db collect
+python ghtraffic.py --db ghtraffic.db collect
 ```
 
 For a temporary PowerShell test:
 
 ```powershell
 $env:GITHUB_TOKEN = "github_pat_..."
-python ghtraffic.py --db githubtraffic.db collect
+python ghtraffic.py --db ghtraffic.db collect
+```
+
+For a temporary Linux shell test:
+
+```bash
+export GITHUB_TOKEN='github_pat_...'
+python3 ghtraffic.py --db ghtraffic.db collect
 ```
 
 Do not commit a script containing the actual token.
 
+When `install.py` is run and `GITHUB_TOKEN` is available only in the current shell, the installer offers to persist it for scheduled collection. On Windows it can save the token in the current user's environment. On Linux it can save the token in `~/.config/ghtraffic/environment` with user-only permissions. Existing credential configuration is preserved and is not silently replaced.
+
 ## 7. Verify the token
 
-Before configuring unattended execution, run GHTraffic manually with the token set and verify that it can:
+Before configuring scheduled execution, run GHTraffic manually with the token set and verify that it can:
 
 1. authenticate as the expected GitHub user;
 2. enumerate the user's repositories;
 3. retrieve traffic data for the monitored repositories; and
-4. update `githubtraffic.db` successfully.
+4. update `ghtraffic.db` successfully.
 
 For example:
 
 ```cmd
-python ghtraffic.py --db githubtraffic.db collect
+python ghtraffic.py --db ghtraffic.db collect
 ```
 
 A permissions error from the traffic endpoints usually indicates that the token does not have **Administration: Read-only** access to the affected repository.
 
-## 8. Windows Task Scheduler
+## 8. Scheduled collection
 
-The scheduled task will run while the user may be logged out, so the token must eventually be made available to that task without requiring an interactive prompt.
+The token must be available to the scheduled collector without requiring an interactive prompt.
 
-Do not put the token directly into the Task Scheduler command line because command-line arguments can be exposed through process inspection and task configuration.
+Do not put the token directly into a Task Scheduler or systemd command line because command-line arguments and service definitions can be exposed through process inspection or configuration files.
 
-The Windows credential-storage mechanism for `GITHUB_TOKEN` will be documented separately before the scheduled task is enabled.
+On Windows, the default installer configuration uses the current user's environment and runs the collector only while that user is logged on. This avoids storing the user's Windows password in Task Scheduler.
+
+On Linux, the systemd user service reads the token from:
+
+```text
+~/.config/ghtraffic/environment
+```
 
 ## 9. Token rotation
 
 If the token expires, is revoked, or is suspected to have been exposed:
 
 1. generate a replacement fine-grained token with the same repository access and permissions;
-2. update the credential used by the scheduled task;
+2. update the stored `GITHUB_TOKEN` used by scheduled collection;
 3. test GHTraffic manually;
 4. revoke the old token in GitHub.
 
