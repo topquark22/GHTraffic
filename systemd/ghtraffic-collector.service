@@ -1,0 +1,8 @@
+[Unit]
+Description=GHTraffic repository traffic collector
+
+[Service]
+Type=oneshot
+EnvironmentFile=%h/.config/ghtraffic/environment
+WorkingDirectory=%h/.local/lib/ghtraffic
+ExecStart=/usr/bin/python3 %h/.local/lib/ghtraffic/ghtraffic.py collect
