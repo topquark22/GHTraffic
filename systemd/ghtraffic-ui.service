@@ -1,0 +1,11 @@
+[Unit]
+Description=GHTraffic local web interface
+
+[Service]
+Type=simple
+WorkingDirectory=%h/.local/lib/ghtraffic
+ExecStart=/usr/bin/python3 %h/.local/lib/ghtraffic/ghtraffic_ui.py
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
