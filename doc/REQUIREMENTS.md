@@ -145,14 +145,20 @@ On Linux, scheduled collection shall use the native user service/timer mechanism
 
 A failed collection run shall not corrupt or discard previously collected traffic history.
 
-### 9. Authentication
+### 9. Configuration and authentication
 
-The application shall authenticate to GitHub using a dedicated access token stored in a local `ghtraffic.properties` file.
+The application shall read local configuration from `ghtraffic.properties`.
 
-The token property shall be named:
+The GitHub access token property shall be named:
 
 ```text
 github.token
+```
+
+The database location property shall be named:
+
+```text
+database.path
 ```
 
 On Windows, the default properties file location shall be:
@@ -167,7 +173,11 @@ On Linux, the default properties file location shall be:
 ~/.config/ghtraffic/ghtraffic.properties
 ```
 
-The collector shall read credentials directly from the properties file. Scheduled execution shall not depend on inheriting a credential environment variable from an interactive shell or login session.
+The collector and user interface shall read the database location from `database.path` rather than from a database-location environment variable. The collector shall read credentials directly from the properties file. Scheduled execution shall not depend on inheriting configuration or credentials from an interactive shell or login session.
+
+The `--db` command-line option shall override `database.path` for a single `ghtraffic.py` invocation.
+
+The runtime collector and user interface shall remain compatible with Cygwin and shall translate a Windows `database.path` value to a Cygwin path when necessary.
 
 Credentials shall not be stored in the SQLite database or committed to the source repository.
 
@@ -213,9 +223,10 @@ The installer shall:
 
 - create the appropriate application, data, and configuration directories;
 - install or update `ghtraffic.py`, `ghtraffic_ui.py`, and required static assets;
-- initialize `ghtraffic.db` from `ddl.sql` when the database does not already exist;
+- configure `database.path` in `ghtraffic.properties` when it is not already configured;
+- initialize the configured SQLite database from `ddl.sql` when the database does not already exist;
 - preserve an existing database during upgrades;
-- preserve an existing `ghtraffic.properties` file during upgrades;
+- preserve an existing `ghtraffic.properties` file and existing property values during upgrades;
 - prompt securely for a GitHub access token when no token is configured;
 - write the token to `ghtraffic.properties` without echoing it to the terminal;
 - verify that the required Python and SQLite support is available;
@@ -223,7 +234,7 @@ The installer shall:
 - configure the user interface to start automatically using the platform's supported mechanism; and
 - start the user interface and report its local URL when installation completes successfully.
 
-The installer shall not overwrite an existing database or silently replace existing credential configuration.
+The installer shall not overwrite an existing database or silently replace existing configuration.
 
 Cygwin shall not be a supported environment for the Windows installer. When launched under Cygwin, the installer shall stop with instructions to rerun it from native Windows Command Prompt.
 
@@ -239,7 +250,7 @@ The user interface shall be implemented as a separate application from the core 
 
 The user interface shall read traffic data from the existing SQLite database and shall not require direct access to the GitHub API for normal reporting.
 
-The user interface shall run from the same codebase on Windows and Linux.
+The user interface shall run from the same codebase on Windows, Linux, and Cygwin.
 
 The user interface shall use only the Python standard library for its HTTP server and API endpoints, together with a small HTML/JavaScript front end displayed in a web browser.
 
