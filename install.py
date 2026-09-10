@@ -266,7 +266,7 @@ def install_windows_tasks():
       <Repetition>
         <Interval>PT1H</Interval>
       </Repetition>
-      <Delay>PT2M</Delay>
+      <Delay>PT1M</Delay>
     </RegistrationTrigger>'''
 
     ui_trigger = f'''<LogonTrigger>
