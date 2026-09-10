@@ -26,7 +26,7 @@ The deployed installation should contain:
 %LOCALAPPDATA%\GHTraffic\
     ghtraffic.py
     ghtraffic_ui.py
-    ghtraffic.db
+    github_traffic.db
     ghtraffic.properties
     static\
         chart.umd.min.js
@@ -43,9 +43,9 @@ copy ghtraffic_ui.py "%LOCALAPPDATA%\GHTraffic\ghtraffic_ui.py"
 xcopy /E /I /Y static "%LOCALAPPDATA%\GHTraffic\static"
 ```
 
-The database should already exist in `%LOCALAPPDATA%\GHTraffic` after the database installation step.
+The database should already exist at the path configured by `database.path` after installation.
 
-The GitHub token is stored separately from the source files in:
+The GitHub token and database location are stored separately from the source files in:
 
 ```text
 %LOCALAPPDATA%\GHTraffic\ghtraffic.properties
@@ -54,6 +54,7 @@ The GitHub token is stored separately from the source files in:
 with:
 
 ```text
+database.path=C:\Users\name\AppData\Local\GHTraffic\github_traffic.db
 github.token=github_pat_...
 ```
 
@@ -67,13 +68,9 @@ Run the deployed collector manually before enabling scheduled execution:
 python "%LOCALAPPDATA%\GHTraffic\ghtraffic.py" collect
 ```
 
-Verify that the command completes successfully and updates:
+Verify that the command completes successfully and updates the database configured by `database.path`.
 
-```text
-%LOCALAPPDATA%\GHTraffic\ghtraffic.db
-```
-
-The collector reads the GitHub token directly from `ghtraffic.properties`. No credential environment variable is required.
+The collector reads its configuration directly from `ghtraffic.properties`. No credential or database-location environment variable is required.
 
 ## Schedule the collector
 
@@ -101,13 +98,13 @@ The `install.py` installer calculates the initial start time automatically, so t
 
 **Actions**
 
-Start the native Windows Python interpreter with the deployed collector. For example:
+Start the native Windows windowless Python interpreter with the deployed collector. For example:
 
 ```text
-%LOCALAPPDATA%\Python\bin\python.exe %LOCALAPPDATA%\GHTraffic\ghtraffic.py collect
+%LOCALAPPDATA%\Python\bin\pythonw.exe %LOCALAPPDATA%\GHTraffic\ghtraffic.py collect
 ```
 
-Use the actual full path to `python.exe` on the machine.
+Use the actual full path to `pythonw.exe` on the machine.
 
 Start in:
 
@@ -192,7 +189,7 @@ Configure the task as follows:
 - Run it under the user's account.
 - Select **Run only when user is logged on**.
 - Use **At log on** as the trigger.
-- Set the action to run the native Windows `python.exe`.
+- Set the action to run the native Windows `pythonw.exe`.
 - Pass `%LOCALAPPDATA%\GHTraffic\ghtraffic_ui.py` as the script argument. If Task Scheduler does not expand the environment variable, use the full path instead.
 - Set **Start in** to `%LOCALAPPDATA%\GHTraffic`, or its full expanded path.
 - Disable **Stop the task if it runs longer than**.
