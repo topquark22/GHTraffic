@@ -135,7 +135,7 @@ The normal scheduled collection interval shall be one hour.
 
 On Windows, the default installation shall configure the collector to run hourly only while the user is logged on. This default shall not require the installer to request, handle, or store the user's Windows password.
 
-The Windows installer shall run an initial collection during installation so useful data is available immediately and shall configure the scheduled task without requiring the user to manually choose a future start date or time.
+The Windows installer shall configure the first collector run for a few minutes after installation and shall not invoke the collector directly during installation. Both the collector and user interface scheduled tasks shall use the windowless Windows Python executable so scheduled execution does not display console windows.
 
 Because each collection refreshes the complete recent views/clones window returned by GitHub, missed hourly runs while the user is logged out or the computer is off shall normally be recovered by the next successful collection. If collection is interrupted for longer than GitHub's traffic-retention window, older daily views/clones that are no longer returned by GitHub cannot be reconstructed and a gap may remain in the local history.
 
@@ -220,13 +220,12 @@ The installer shall:
 - write the token to `ghtraffic.properties` without echoing it to the terminal;
 - verify that the required Python and SQLite support is available;
 - configure the platform's supported collector scheduling mechanism;
-- configure the user interface to start automatically using the platform's supported mechanism;
-- run an initial collection when credentials are available; and
+- configure the user interface to start automatically using the platform's supported mechanism; and
 - start the user interface and report its local URL when installation completes successfully.
 
 The installer shall not overwrite an existing database or silently replace existing credential configuration.
 
-The installer shall not require Cygwin on Windows. When the installer itself is launched under Cygwin, it shall still perform a native Windows installation and configure Task Scheduler to use a native Windows Python interpreter.
+Cygwin shall not be a supported environment for the Windows installer. When launched under Cygwin, the installer shall stop with instructions to rerun it from native Windows Command Prompt.
 
 Native Windows installation shall rely on Python's standard-library SQLite support rather than requiring a separate `sqlite3.exe` installation.
 
