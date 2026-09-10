@@ -1,6 +1,14 @@
 # GHTraffic Linux Deployment
 
-This document describes deployment of GHTraffic on Linux after the initial setup and GitHub authentication steps have been completed.
+This document describes manual deployment of GHTraffic on Linux after the initial setup and GitHub authentication steps have been completed.
+
+For the normal installation path, run:
+
+```bash
+python3 install.py
+```
+
+The installer performs these steps automatically. This document is retained for users who want the details or need a custom deployment.
 
 See [SETUP.md](SETUP.md) for database setup, [GITHUB_SETUP.md](GITHUB_SETUP.md) for GitHub token configuration, and [USAGE.md](USAGE.md) for command-line usage.
 
@@ -68,7 +76,9 @@ The default Linux database path is:
 ~/.local/share/ghtraffic/ghtraffic.db
 ```
 
-Run the database installer from the source tree:
+The main `install.py` installer initializes the database automatically when it does not already exist and preserves an existing database during upgrades.
+
+For database-only initialization, run the database installer from the source tree:
 
 ```bash
 ./install_db.sh
@@ -113,6 +123,8 @@ Restrict access to the file:
 chmod 600 ~/.config/ghtraffic/environment
 ```
 
+When `install.py` is run with `GITHUB_TOKEN` set in the current shell and no existing environment file, it offers to create this file. Existing credential configuration is preserved.
+
 Do not commit this file or place the token in the systemd unit itself.
 
 ## Test the collector
@@ -147,11 +159,12 @@ with:
 
 ```ini
 [Unit]
-Description=GHTraffic collector
+Description=GHTraffic repository traffic collector
 
 [Service]
 Type=oneshot
 EnvironmentFile=%h/.config/ghtraffic/environment
+WorkingDirectory=%h/.local/lib/ghtraffic
 ExecStart=/usr/bin/python3 %h/.local/lib/ghtraffic/ghtraffic.py collect
 ```
 
@@ -168,9 +181,9 @@ with:
 Description=Run GHTraffic collector hourly
 
 [Timer]
-OnBootSec=5min
-OnUnitActiveSec=1h
+OnCalendar=hourly
 Persistent=true
+Unit=ghtraffic-collector.service
 
 [Install]
 WantedBy=timers.target
@@ -215,11 +228,11 @@ with:
 
 ```ini
 [Unit]
-Description=GHTraffic web UI
-After=network.target
+Description=GHTraffic local web interface
 
 [Service]
 Type=simple
+WorkingDirectory=%h/.local/lib/ghtraffic
 ExecStart=/usr/bin/python3 %h/.local/lib/ghtraffic/ghtraffic_ui.py
 Restart=on-failure
 
@@ -282,7 +295,15 @@ GitHub traffic dates are UTC, and the graph labels its date axis accordingly.
 
 ## Updating an existing Linux deployment
 
-After pulling a newer version of GHTraffic, copy the current application files again:
+The simplest update procedure is to run the current installer again:
+
+```bash
+python3 install.py
+```
+
+The installer replaces the application and static files, preserves the existing database and credential configuration, updates the systemd user units, and restarts the UI.
+
+For a manual update, copy the current application files again:
 
 ```bash
 cp ghtraffic.py ~/.local/lib/ghtraffic/
