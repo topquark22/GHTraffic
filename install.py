@@ -391,7 +391,7 @@ def main():
     verify_python()
     verify_sources()
 
-    if sys.platform == "win32":
+    if sys.platform in ("win32", "cygwin"):
         app_dir, db_path = windows_paths()
         install_files(app_dir)
         initialize_database(db_path)
