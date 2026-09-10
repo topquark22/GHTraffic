@@ -13,7 +13,6 @@ from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 
-DB_FILENAME = "ghtraffic.db"
 PROPERTIES_FILENAME = "ghtraffic.properties"
 GITHUB_API = "https://api.github.com"
 REQUIRED_TABLES = {
@@ -39,21 +38,6 @@ def windows_app_dir():
         return Path(result.stdout.strip()) / "GHTraffic"
 
     return Path(local_app_data) / "GHTraffic"
-
-
-def default_db_path():
-    override = os.environ.get("GHTRAFFIC_DB")
-    if override:
-        return Path(override).expanduser()
-
-    if sys.platform in ("win32", "cygwin"):
-        return windows_app_dir() / DB_FILENAME
-
-    data_home = os.environ.get("XDG_DATA_HOME")
-    if data_home:
-        return Path(data_home).expanduser() / "ghtraffic" / DB_FILENAME
-
-    return Path.home() / ".local" / "share" / "ghtraffic" / DB_FILENAME
 
 
 def default_properties_path():
@@ -82,6 +66,27 @@ def load_properties(path):
         properties[key.strip()] = value.strip()
 
     return properties
+
+
+def database_path():
+    properties_path = default_properties_path()
+    properties = load_properties(properties_path)
+    value = properties.get("database.path")
+    if not value:
+        raise RuntimeError(
+            f"database.path is not set in properties file: {properties_path}"
+        )
+
+    if sys.platform == "cygwin":
+        result = subprocess.run(
+            ["cygpath", "-u", value],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        return Path(result.stdout.strip())
+
+    return Path(value).expanduser()
 
 
 def github_token():
@@ -555,7 +560,7 @@ def parse_args():
 
 def main():
     args = parse_args()
-    db_path = args.db.expanduser() if args.db else default_db_path()
+    db_path = args.db.expanduser() if args.db else database_path()
 
     if not db_path.exists():
         print(f"Error: database does not exist: {db_path}", file=sys.stderr)
