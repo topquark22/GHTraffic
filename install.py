@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 
+import csv
+import html
+import io
 import os
 import shutil
 import sqlite3
 import subprocess
 import sys
+import tempfile
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -40,6 +44,14 @@ def verify_python():
 
     print(f"Python: {sys.executable}")
     print(f"SQLite: {sqlite3.sqlite_version}")
+
+
+def prompt_yes_no(prompt, default=True):
+    suffix = " [Y/n] " if default else " [y/N] "
+    response = input(prompt + suffix).strip().lower()
+    if not response:
+        return default
+    return response in ("y", "yes")
 
 
 def windows_paths():
@@ -95,8 +107,112 @@ def initialize_database(db_path):
     print(f"Created database: {db_path}")
 
 
-def windows_task_xml(command, arguments, working_directory, trigger_xml):
-    username = os.environ.get("USERNAME", "")
+def windows_environment_token():
+    import winreg
+
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment") as key:
+            value, _ = winreg.QueryValueEx(key, "GITHUB_TOKEN")
+            return value or None
+    except FileNotFoundError:
+        return None
+
+
+def set_windows_environment_token(token):
+    import winreg
+
+    with winreg.CreateKey(winreg.HKEY_CURRENT_USER, "Environment") as key:
+        winreg.SetValueEx(key, "GITHUB_TOKEN", 0, winreg.REG_SZ, token)
+
+
+def configure_windows_credentials():
+    stored_token = windows_environment_token()
+    if stored_token:
+        print("Using existing GITHUB_TOKEN from the Windows user environment.")
+        return os.environ.get("GITHUB_TOKEN") or stored_token
+
+    token = os.environ.get("GITHUB_TOKEN")
+    if not token:
+        print(
+            "GITHUB_TOKEN is not configured. Scheduled collection will require "
+            "it to be added to the Windows user environment."
+        )
+        return None
+
+    if prompt_yes_no(
+        "Save the current GITHUB_TOKEN in the Windows user environment for scheduled collection?"
+    ):
+        set_windows_environment_token(token)
+        print("Saved GITHUB_TOKEN in the Windows user environment.")
+    else:
+        print(
+            "GITHUB_TOKEN was not persisted. The initial collection can use the "
+            "current shell value, but scheduled collection may not authenticate."
+        )
+
+    return token
+
+
+def linux_environment_path():
+    return Path.home() / ".config" / "ghtraffic" / "environment"
+
+
+def read_linux_environment_token(path):
+    if not path.exists():
+        return None
+
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.startswith("GITHUB_TOKEN="):
+            return line.partition("=")[2] or None
+
+    return None
+
+
+def configure_linux_credentials():
+    environment_path = linux_environment_path()
+    stored_token = read_linux_environment_token(environment_path)
+    if stored_token:
+        print(f"Using existing credential file: {environment_path}")
+        return os.environ.get("GITHUB_TOKEN") or stored_token
+
+    token = os.environ.get("GITHUB_TOKEN")
+    if not token:
+        print(
+            f"GITHUB_TOKEN is not configured. Scheduled collection will require "
+            f"it in {environment_path}."
+        )
+        return None
+
+    if prompt_yes_no(
+        f"Save the current GITHUB_TOKEN in {environment_path} for scheduled collection?"
+    ):
+        environment_path.parent.mkdir(parents=True, exist_ok=True)
+        environment_path.write_text(f"GITHUB_TOKEN={token}\n", encoding="utf-8")
+        environment_path.chmod(0o600)
+        print(f"Saved GITHUB_TOKEN in {environment_path}.")
+    else:
+        print(
+            "GITHUB_TOKEN was not persisted. The initial collection can use the "
+            "current shell value, but scheduled collection may not authenticate."
+        )
+
+    return token
+
+
+def windows_user_sid():
+    result = subprocess.run(
+        ["whoami", "/user", "/fo", "csv", "/nh"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    row = next(csv.reader(io.StringIO(result.stdout)))
+    if len(row) < 2 or not row[1]:
+        raise RuntimeError("could not determine the current Windows user SID")
+    return row[1]
+
+
+def windows_task_xml(user_sid, command, arguments, working_directory, trigger_xml):
     return f'''<?xml version="1.0" encoding="UTF-16"?>
 <Task version="1.4" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
   <Triggers>
@@ -104,31 +220,42 @@ def windows_task_xml(command, arguments, working_directory, trigger_xml):
   </Triggers>
   <Principals>
     <Principal id="Author">
-      <UserId>{username}</UserId>
+      <UserId>{html.escape(user_sid)}</UserId>
       <LogonType>InteractiveToken</LogonType>
       <RunLevel>LeastPrivilege</RunLevel>
     </Principal>
   </Principals>
   <Settings>
     <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+    <AllowStartOnDemand>true</AllowStartOnDemand>
     <StartWhenAvailable>true</StartWhenAvailable>
     <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>
     <Enabled>true</Enabled>
   </Settings>
   <Actions Context="Author">
     <Exec>
-      <Command>{command}</Command>
-      <Arguments>{arguments}</Arguments>
-      <WorkingDirectory>{working_directory}</WorkingDirectory>
+      <Command>{html.escape(str(command))}</Command>
+      <Arguments>{html.escape(arguments)}</Arguments>
+      <WorkingDirectory>{html.escape(str(working_directory))}</WorkingDirectory>
     </Exec>
   </Actions>
 </Task>
 '''
 
 
+def stop_windows_task(name):
+    subprocess.run(
+        ["schtasks", "/End", "/TN", name],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+
+
 def register_windows_task(name, xml):
-    temp_dir = Path(os.environ.get("TEMP", "."))
-    xml_path = temp_dir / f"{name.replace(' ', '_')}.xml"
+    xml_path = Path(tempfile.gettempdir()) / f"{name.replace(' ', '_')}.xml"
     xml_path.write_text(xml, encoding="utf-16")
     try:
         run(["schtasks", "/Create", "/TN", name, "/XML", str(xml_path), "/F"])
@@ -140,61 +267,74 @@ def register_windows_task(name, xml):
 
 
 def install_windows_tasks(app_dir):
+    user_sid = windows_user_sid()
     python = Path(sys.executable)
-    start = datetime.now() + timedelta(minutes=5)
-    start_boundary = start.astimezone().isoformat(timespec="seconds")
+    start = datetime.now().astimezone() + timedelta(minutes=5)
+    start_boundary = start.isoformat(timespec="seconds")
 
     collector_trigger = f'''<TimeTrigger>
       <StartBoundary>{start_boundary}</StartBoundary>
       <Enabled>true</Enabled>
       <Repetition>
         <Interval>PT1H</Interval>
-        <StopAtDurationEnd>false</StopAtDurationEnd>
       </Repetition>
     </TimeTrigger>'''
 
-    ui_trigger = '''<LogonTrigger>
+    ui_trigger = f'''<LogonTrigger>
       <Enabled>true</Enabled>
+      <UserId>{html.escape(user_sid)}</UserId>
     </LogonTrigger>'''
 
     collector_xml = windows_task_xml(
+        user_sid,
         python,
         f'"{app_dir / "ghtraffic.py"}" collect',
         app_dir,
         collector_trigger,
     )
     ui_xml = windows_task_xml(
+        user_sid,
         python,
         f'"{app_dir / "ghtraffic_ui.py"}"',
         app_dir,
         ui_trigger,
     )
 
+    stop_windows_task("GHTraffic Collector")
+    stop_windows_task("GHTraffic UI")
     register_windows_task("GHTraffic Collector", collector_xml)
     register_windows_task("GHTraffic UI", ui_xml)
-    print("Configured Windows tasks for the logged-on user.")
+    print("Configured password-free Windows tasks for the logged-on user.")
+
+
+def systemd_quote(value):
+    return '"' + str(value).replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
 def install_linux_units(app_dir):
+    if not shutil.which("systemctl"):
+        raise RuntimeError("systemctl is required for Linux installation")
+
     systemd_dir = Path.home() / ".config" / "systemd" / "user"
     systemd_dir.mkdir(parents=True, exist_ok=True)
 
     collector_service = f'''[Unit]
-Description=Collect GitHub traffic statistics
+Description=GHTraffic repository traffic collector
 
 [Service]
 Type=oneshot
 EnvironmentFile=-%h/.config/ghtraffic/environment
-ExecStart={sys.executable} {app_dir / "ghtraffic.py"} collect
+WorkingDirectory={systemd_quote(app_dir)}
+ExecStart={systemd_quote(sys.executable)} {systemd_quote(app_dir / "ghtraffic.py")} collect
 '''
 
     collector_timer = '''[Unit]
-Description=Collect GitHub traffic statistics hourly
+Description=Run GHTraffic collector hourly
 
 [Timer]
-OnBootSec=5min
-OnUnitActiveSec=1h
+OnCalendar=hourly
 Persistent=true
+Unit=ghtraffic-collector.service
 
 [Install]
 WantedBy=timers.target
@@ -205,7 +345,8 @@ Description=GHTraffic local web interface
 
 [Service]
 Type=simple
-ExecStart={sys.executable} {app_dir / "ghtraffic_ui.py"}
+WorkingDirectory={systemd_quote(app_dir)}
+ExecStart={systemd_quote(sys.executable)} {systemd_quote(app_dir / "ghtraffic_ui.py")}
 Restart=on-failure
 
 [Install]
@@ -224,17 +365,24 @@ WantedBy=default.target
         print(f"Installed: {path}")
 
     run(["systemctl", "--user", "daemon-reload"])
-    run(["systemctl", "--user", "enable", "--now", "ghtraffic-collector.timer"])
-    run(["systemctl", "--user", "enable", "--now", "ghtraffic-ui.service"])
+    run(["systemctl", "--user", "enable", "ghtraffic-collector.timer"])
+    run(["systemctl", "--user", "restart", "ghtraffic-collector.timer"])
+    run(["systemctl", "--user", "enable", "ghtraffic-ui.service"])
+    run(["systemctl", "--user", "restart", "ghtraffic-ui.service"])
 
 
-def run_initial_collection(app_dir):
-    if not os.environ.get("GITHUB_TOKEN"):
-        print("GITHUB_TOKEN is not set; skipping initial collection.")
+def run_initial_collection(app_dir, token):
+    if not token:
+        print("No GITHUB_TOKEN is available; skipping initial collection.")
         return
 
     print("Running initial collection...")
-    result = subprocess.run([sys.executable, str(app_dir / "ghtraffic.py"), "collect"])
+    environment = os.environ.copy()
+    environment["GITHUB_TOKEN"] = token
+    result = subprocess.run(
+        [sys.executable, str(app_dir / "ghtraffic.py"), "collect"],
+        env=environment,
+    )
     if result.returncode != 0:
         print("Initial collection failed; scheduled collection is still configured.")
 
@@ -247,15 +395,17 @@ def main():
         app_dir, db_path = windows_paths()
         install_files(app_dir)
         initialize_database(db_path)
+        token = configure_windows_credentials()
         install_windows_tasks(app_dir)
-        run_initial_collection(app_dir)
+        run_initial_collection(app_dir, token)
         run(["schtasks", "/Run", "/TN", "GHTraffic UI"])
     elif sys.platform.startswith("linux"):
         app_dir, db_path = linux_paths()
         install_files(app_dir)
         initialize_database(db_path)
+        token = configure_linux_credentials()
         install_linux_units(app_dir)
-        run_initial_collection(app_dir)
+        run_initial_collection(app_dir, token)
     else:
         raise RuntimeError(f"unsupported operating system: {sys.platform}")
 
