@@ -1,0 +1,10 @@
+[Unit]
+Description=Run GHTraffic collector hourly
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+Unit=ghtraffic-collector.service
+
+[Install]
+WantedBy=timers.target
