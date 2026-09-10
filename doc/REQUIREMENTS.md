@@ -147,7 +147,27 @@ A failed collection run shall not corrupt or discard previously collected traffi
 
 ### 9. Authentication
 
-The application shall authenticate to GitHub using a dedicated access token supplied through the `GITHUB_TOKEN` environment variable.
+The application shall authenticate to GitHub using a dedicated access token stored in a local `ghtraffic.properties` file.
+
+The token property shall be named:
+
+```text
+github.token
+```
+
+On Windows, the default properties file location shall be:
+
+```text
+%LOCALAPPDATA%\GHTraffic\ghtraffic.properties
+```
+
+On Linux, the default properties file location shall be:
+
+```text
+~/.config/ghtraffic/ghtraffic.properties
+```
+
+The collector shall read credentials directly from the properties file. Scheduled execution shall not depend on inheriting a credential environment variable from an interactive shell or login session.
 
 Credentials shall not be stored in the SQLite database or committed to the source repository.
 
@@ -191,10 +211,13 @@ The installer shall detect the host operating system and keep operating-system-s
 
 The installer shall:
 
-- create the appropriate application and data directories;
+- create the appropriate application, data, and configuration directories;
 - install or update `ghtraffic.py`, `ghtraffic_ui.py`, and required static assets;
 - initialize `ghtraffic.db` from `ddl.sql` when the database does not already exist;
 - preserve an existing database during upgrades;
+- preserve an existing `ghtraffic.properties` file during upgrades;
+- prompt securely for a GitHub access token when no token is configured;
+- write the token to `ghtraffic.properties` without echoing it to the terminal;
 - verify that the required Python and SQLite support is available;
 - configure the platform's supported collector scheduling mechanism;
 - configure the user interface to start automatically using the platform's supported mechanism;
@@ -203,7 +226,9 @@ The installer shall:
 
 The installer shall not overwrite an existing database or silently replace existing credential configuration.
 
-The installer shall not require Cygwin on Windows. Native Windows installation shall rely on Python's standard-library SQLite support rather than requiring a separate `sqlite3.exe` installation.
+The installer shall not require Cygwin on Windows. When the installer itself is launched under Cygwin, it shall still perform a native Windows installation and configure Task Scheduler to use a native Windows Python interpreter.
+
+Native Windows installation shall rely on Python's standard-library SQLite support rather than requiring a separate `sqlite3.exe` installation.
 
 Platform-specific scheduling and service configuration shall remain outside the core collector and UI code wherever practical.
 
