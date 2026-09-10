@@ -11,7 +11,7 @@ python install.py
 
 When no GitHub token is already configured, the installer prompts for it securely and stores it in `%LOCALAPPDATA%\GHTraffic\ghtraffic.properties`. See [GITHUB_SETUP.md](GITHUB_SETUP.md) for token creation and credential details.
 
-The installer performs the application deployment, database initialization, hourly Task Scheduler configuration, initial collection when credentials are available, and UI startup. The remaining sections document the underlying Windows setup in more detail.
+The installer performs the application deployment, database initialization, hourly Task Scheduler configuration, and UI startup. The remaining sections document the underlying Windows setup in more detail.
 
 ## 1. Python
 
@@ -127,9 +127,9 @@ GHTraffic Collector
 
 The collector runs once per hour while the user is logged on. This is the default because it does not require the user's Windows password.
 
-The installer computes a valid first start time automatically, a few minutes in the future, and runs one initial collection immediately when `github.token` is configured. The user therefore does not have to choose a future start date or time manually.
+The installer computes a valid first start time automatically, a few minutes in the future. It does not invoke the collector during installation; the first scheduled run performs the initial collection.
 
-The task runs under the Windows user account that owns the GHTraffic data and credentials, uses the native Windows Python interpreter, and is configured not to start overlapping collector instances.
+The task runs under the Windows user account that owns the GHTraffic data and credentials, uses `pythonw.exe` so no console window appears, and is configured not to start overlapping collector instances.
 
 Short interruptions do not normally create gaps because each collection refreshes the recent daily traffic window returned by GitHub. If no collection succeeds for longer than GitHub's retention window, older daily traffic that GitHub no longer returns cannot be reconstructed.
 
@@ -143,7 +143,7 @@ The installer creates a separate task named:
 GHTraffic UI
 ```
 
-The UI task starts at user logon and runs only under the logged-on user's interactive session. It does not require elevated privileges or the user's Windows password.
+The UI task starts at user logon and runs only under the logged-on user's interactive session. It uses `pythonw.exe`, so no console window remains open. It does not require elevated privileges or the user's Windows password.
 
 The UI remains available at:
 
