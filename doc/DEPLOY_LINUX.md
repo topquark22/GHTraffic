@@ -1,4 +1,4 @@
-# GHTraffic Linux Deployment
+# GHTraffic Deployment - Linux
 
 This document describes manual deployment of GHTraffic on Linux after the initial setup and GitHub authentication steps have been completed.
 
