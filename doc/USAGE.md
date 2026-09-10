@@ -2,7 +2,19 @@
 
 GHTraffic provides three command-line commands through `ghtraffic.py`: `collect`, `show`, and `referrers`.
 
-By default, the program reads the SQLite database location from `database.path` in `ghtraffic.properties`.
+By default, the program reads the SQLite database location from `database.path` in the per-user `ghtraffic.properties` file. It does not look for a properties file in the current directory or beside `ghtraffic.py`.
+
+The properties file is located at:
+
+```text
+Windows / Cygwin:
+%LOCALAPPDATA%\GHTraffic\ghtraffic.properties
+
+Linux:
+~/.config/ghtraffic/ghtraffic.properties
+```
+
+This means that running `ghtraffic.py` manually from a source checkout still uses the same configuration as the deployed application.
 
 ## Collect traffic
 
