@@ -16,6 +16,10 @@ The installer supports Windows and Linux. It installs the application, initializ
 
 For manual installation and platform-specific details, see the deployment documents below.
 
+## Usage
+
+The [interface](http://localhost:8501) is at `http://localhost:8501`
+
 ## Documentation
 
 - [GitHub authentication](doc/GITHUB_SETUP.md)
