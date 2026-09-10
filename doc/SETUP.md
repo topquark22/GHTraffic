@@ -45,35 +45,31 @@ No Cygwin SQLite package is required.
 
 ## 3. Database location
 
-The database file is named:
+The database file is normally named:
 
 ```text
 ghtraffic.db
 ```
 
-On Windows, its default location is:
+On Windows, the installer initially configures:
 
 ```text
 %LOCALAPPDATA%\GHTraffic\ghtraffic.db
 ```
 
-Create the directory if it does not already exist:
-
-```cmd
-mkdir "%LOCALAPPDATA%\GHTraffic"
-```
-
-The application determines this location at runtime from the `LOCALAPPDATA` environment variable rather than hard-coding a user profile path.
-
-An explicit database path may be supplied through the environment variable:
+The configured database location is stored in:
 
 ```text
-GHTRAFFIC_DB
+%LOCALAPPDATA%\GHTraffic\ghtraffic.properties
 ```
 
-When set, `GHTRAFFIC_DB` overrides the platform default.
+using the property:
 
-The `--db` command-line option overrides both the environment variable and the platform default. This is useful for local testing:
+```text
+database.path=C:\Users\name\AppData\Local\GHTraffic\ghtraffic.db
+```
+
+Both the collector and the UI read the database location from this property. The `--db` command-line option overrides it for a single invocation and is useful for local testing:
 
 ```cmd
 python ghtraffic.py --db ghtraffic.db show
@@ -81,25 +77,15 @@ python ghtraffic.py --db ghtraffic.db show
 
 The live database should not be stored in or committed to the GHTraffic source repository.
 
-## 4. Initialize the database manually
+## 4. Initialize the database
 
-The main `install.py` installer initializes the database automatically when it does not already exist and preserves an existing database during upgrades.
+The main `install.py` installer initializes the configured database automatically when it does not already exist and preserves an existing database during upgrades.
 
-For database-only initialization from Command Prompt, run:
-
-```cmd
-install_db.bat
-```
-
-The Windows database installer uses Python's built-in `sqlite3` module, so neither Cygwin nor the standalone SQLite command-line program is required.
-
-To initialize an alternate database for testing:
+To initialize a fresh installation, run:
 
 ```cmd
-install_db.bat -d .\ghtraffic.db
+python install.py
 ```
-
-`GHTRAFFIC_DB` is honored when `-d` is not supplied. Otherwise the installer creates the database at the standard Windows location.
 
 ## 5. Credentials
 
