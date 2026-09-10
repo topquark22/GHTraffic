@@ -69,19 +69,19 @@ GitHub supplies referrer statistics as a rolling aggregate rather than daily his
 
 ## Use another database
 
-The normal database path is configured in `ghtraffic.properties`:
+The normal database path is configured in `ghtraffic.properties`. A typical Linux value is:
 
 ```text
-database.path=/path/to/ghtraffic.db
+database.path=/path/to/github_traffic.db
 ```
 
 The `--db` option selects an explicit SQLite database file for a single command and must appear before the command:
 
 ```bash
-python ghtraffic.py --db ./ghtraffic.db show
-python ghtraffic.py --db ./ghtraffic.db show 30
-python ghtraffic.py --db ./ghtraffic.db referrers
-python ghtraffic.py --db ./ghtraffic.db collect
+python ghtraffic.py --db ./github_traffic.db show
+python ghtraffic.py --db ./github_traffic.db show 30
+python ghtraffic.py --db ./github_traffic.db referrers
+python ghtraffic.py --db ./github_traffic.db collect
 ```
 
 The `--db` command-line option takes precedence over `database.path` and is intended primarily for testing and manual use.
