@@ -1,0 +1,299 @@
+# GHTraffic Linux Deployment
+
+This document describes deployment of GHTraffic on Linux after the initial setup and GitHub authentication steps have been completed.
+
+See [SETUP.md](SETUP.md) for database setup, [GITHUB_SETUP.md](GITHUB_SETUP.md) for GitHub token configuration, and [USAGE.md](USAGE.md) for command-line usage.
+
+## Application and data directories
+
+GHTraffic uses separate per-user locations for application files, data, configuration, and systemd units.
+
+Recommended application directory:
+
+```text
+~/.local/lib/ghtraffic/
+```
+
+Default database location:
+
+```text
+~/.local/share/ghtraffic/ghtraffic.db
+```
+
+Configuration directory:
+
+```text
+~/.config/ghtraffic/
+```
+
+Systemd user units:
+
+```text
+~/.config/systemd/user/
+```
+
+The deployed application directory should contain:
+
+```text
+~/.local/lib/ghtraffic/
+    ghtraffic.py
+    ghtraffic_ui.py
+    static/
+        chart.umd.min.js
+        favicon.ico
+```
+
+Create the required directories:
+
+```bash
+mkdir -p ~/.local/lib/ghtraffic
+mkdir -p ~/.local/share/ghtraffic
+mkdir -p ~/.config/ghtraffic
+mkdir -p ~/.config/systemd/user
+```
+
+Copy the application files from the source tree:
+
+```bash
+cp ghtraffic.py ~/.local/lib/ghtraffic/
+cp ghtraffic_ui.py ~/.local/lib/ghtraffic/
+cp -R static ~/.local/lib/ghtraffic/
+```
+
+## Initialize the database
+
+The default Linux database path is:
+
+```text
+~/.local/share/ghtraffic/ghtraffic.db
+```
+
+Run the database installer from the source tree:
+
+```bash
+./install_db.sh
+```
+
+To initialize another database explicitly:
+
+```bash
+./install_db.sh -d /path/to/ghtraffic.db
+```
+
+## Configure GitHub authentication
+
+GHTraffic reads the GitHub access token from:
+
+```text
+GITHUB_TOKEN
+```
+
+For an interactive test:
+
+```bash
+export GITHUB_TOKEN='github_pat_...'
+python3 ~/.local/lib/ghtraffic/ghtraffic.py collect
+```
+
+For unattended systemd execution, store the token in a private environment file:
+
+```text
+~/.config/ghtraffic/environment
+```
+
+with contents:
+
+```text
+GITHUB_TOKEN=github_pat_...
+```
+
+Restrict access to the file:
+
+```bash
+chmod 600 ~/.config/ghtraffic/environment
+```
+
+Do not commit this file or place the token in the systemd unit itself.
+
+## Test the collector
+
+Run:
+
+```bash
+python3 ~/.local/lib/ghtraffic/ghtraffic.py collect
+```
+
+Then verify the report:
+
+```bash
+python3 ~/.local/lib/ghtraffic/ghtraffic.py show
+```
+
+The collector should update:
+
+```text
+~/.local/share/ghtraffic/ghtraffic.db
+```
+
+## Schedule the collector with systemd
+
+Create:
+
+```text
+~/.config/systemd/user/ghtraffic-collector.service
+```
+
+with:
+
+```ini
+[Unit]
+Description=GHTraffic collector
+
+[Service]
+Type=oneshot
+EnvironmentFile=%h/.config/ghtraffic/environment
+ExecStart=/usr/bin/python3 %h/.local/lib/ghtraffic/ghtraffic.py collect
+```
+
+Create:
+
+```text
+~/.config/systemd/user/ghtraffic-collector.timer
+```
+
+with:
+
+```ini
+[Unit]
+Description=Run GHTraffic collector hourly
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=1h
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+```
+
+Reload the user systemd configuration and enable the timer:
+
+```bash
+systemctl --user daemon-reload
+systemctl --user enable --now ghtraffic-collector.timer
+```
+
+Verify it with:
+
+```bash
+systemctl --user status ghtraffic-collector.timer
+systemctl --user list-timers ghtraffic-collector.timer
+```
+
+Run the collector immediately for testing:
+
+```bash
+systemctl --user start ghtraffic-collector.service
+```
+
+Inspect its status and logs:
+
+```bash
+systemctl --user status ghtraffic-collector.service
+journalctl --user -u ghtraffic-collector.service
+```
+
+## Run the user interface continuously
+
+Create:
+
+```text
+~/.config/systemd/user/ghtraffic-ui.service
+```
+
+with:
+
+```ini
+[Unit]
+Description=GHTraffic web UI
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 %h/.local/lib/ghtraffic/ghtraffic_ui.py
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
+```
+
+Reload systemd and enable the service:
+
+```bash
+systemctl --user daemon-reload
+systemctl --user enable --now ghtraffic-ui.service
+```
+
+Verify:
+
+```bash
+systemctl --user status ghtraffic-ui.service
+```
+
+Then open:
+
+```text
+http://127.0.0.1:8501
+```
+
+The UI listens only on `127.0.0.1`, so it is available only from the local machine.
+
+If the traffic chart is missing, verify:
+
+```text
+~/.local/lib/ghtraffic/static/chart.umd.min.js
+```
+
+If the favicon is missing, verify:
+
+```text
+~/.local/lib/ghtraffic/static/favicon.ico
+```
+
+## Run user services without an active login session
+
+On Linux systems using systemd-logind, user services normally start with the user's login session. If GHTraffic must continue running after logout or start at boot before an interactive login, enable lingering for the account:
+
+```bash
+loginctl enable-linger "$USER"
+```
+
+This is normally a one-time administrative configuration.
+
+## Traffic history availability
+
+The **Period** selector limits the chart to the requested number of days, but GHTraffic displays only traffic records that actually exist in the local database.
+
+GitHub supplies only a short recent window of daily traffic data. GHTraffic preserves those records on each collection so longer history accumulates over time.
+
+GHTraffic does not synthesize zero-valued records for dates before collection began or for dates for which no record exists. A missing record means that traffic is unknown; it must not be interpreted as zero views or zero clones.
+
+GitHub traffic dates are UTC, and the graph labels its date axis accordingly.
+
+## Updating an existing Linux deployment
+
+After pulling a newer version of GHTraffic, copy the current application files again:
+
+```bash
+cp ghtraffic.py ~/.local/lib/ghtraffic/
+cp ghtraffic_ui.py ~/.local/lib/ghtraffic/
+cp -R static ~/.local/lib/ghtraffic/
+```
+
+Restart the UI after updating `ghtraffic_ui.py` or files under `static`:
+
+```bash
+systemctl --user restart ghtraffic-ui.service
+```
+
+The collector service is short-lived and will use the updated `ghtraffic.py` automatically on its next run.
