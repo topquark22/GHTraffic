@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import csv
+import getpass
 import html
 import io
 import os
@@ -14,6 +15,7 @@ from pathlib import Path
 
 
 DB_FILENAME = "ghtraffic.db"
+PROPERTIES_FILENAME = "ghtraffic.properties"
 SOURCE_DIR = Path(__file__).resolve().parent
 
 
@@ -46,12 +48,14 @@ def verify_python():
     print(f"SQLite: {sqlite3.sqlite_version}")
 
 
-def prompt_yes_no(prompt, default=True):
-    suffix = " [Y/n] " if default else " [y/N] "
-    response = input(prompt + suffix).strip().lower()
-    if not response:
-        return default
-    return response in ("y", "yes")
+def cygwin_path(path, option):
+    result = subprocess.run(
+        ["cygpath", option, str(path)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout.strip()
 
 
 def windows_paths():
@@ -59,16 +63,27 @@ def windows_paths():
     if not local_app_data:
         raise RuntimeError("LOCALAPPDATA is not set")
 
-    app_dir = Path(local_app_data) / "GHTraffic"
-    return app_dir, app_dir / DB_FILENAME
+    if sys.platform == "cygwin":
+        app_dir = Path(cygwin_path(local_app_data, "-u")) / "GHTraffic"
+    else:
+        app_dir = Path(local_app_data) / "GHTraffic"
+
+    return app_dir, app_dir / DB_FILENAME, app_dir / PROPERTIES_FILENAME
 
 
 def linux_paths():
     data_home = Path(
         os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share")
     ).expanduser()
+    config_home = Path(
+        os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")
+    ).expanduser()
     app_dir = Path.home() / ".local" / "lib" / "ghtraffic"
-    return app_dir, data_home / "ghtraffic" / DB_FILENAME
+    return (
+        app_dir,
+        data_home / "ghtraffic" / DB_FILENAME,
+        config_home / "ghtraffic" / PROPERTIES_FILENAME,
+    )
 
 
 def install_files(app_dir):
@@ -107,96 +122,45 @@ def initialize_database(db_path):
     print(f"Created database: {db_path}")
 
 
-def windows_environment_token():
-    import winreg
-
-    try:
-        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment") as key:
-            value, _ = winreg.QueryValueEx(key, "GITHUB_TOKEN")
-            return value or None
-    except FileNotFoundError:
-        return None
-
-
-def set_windows_environment_token(token):
-    import winreg
-
-    with winreg.CreateKey(winreg.HKEY_CURRENT_USER, "Environment") as key:
-        winreg.SetValueEx(key, "GITHUB_TOKEN", 0, winreg.REG_SZ, token)
-
-
-def configure_windows_credentials():
-    stored_token = windows_environment_token()
-    if stored_token:
-        print("Using existing GITHUB_TOKEN from the Windows user environment.")
-        return os.environ.get("GITHUB_TOKEN") or stored_token
-
-    token = os.environ.get("GITHUB_TOKEN")
-    if not token:
-        print(
-            "GITHUB_TOKEN is not configured. Scheduled collection will require "
-            "it to be added to the Windows user environment."
-        )
-        return None
-
-    if prompt_yes_no(
-        "Save the current GITHUB_TOKEN in the Windows user environment for scheduled collection?"
-    ):
-        set_windows_environment_token(token)
-        print("Saved GITHUB_TOKEN in the Windows user environment.")
-    else:
-        print(
-            "GITHUB_TOKEN was not persisted. The initial collection can use the "
-            "current shell value, but scheduled collection may not authenticate."
-        )
-
-    return token
-
-
-def linux_environment_path():
-    return Path.home() / ".config" / "ghtraffic" / "environment"
-
-
-def read_linux_environment_token(path):
+def read_properties(path):
+    properties = {}
     if not path.exists():
-        return None
+        return properties
 
     for line in path.read_text(encoding="utf-8").splitlines():
-        if line.startswith("GITHUB_TOKEN="):
-            return line.partition("=")[2] or None
+        line = line.strip()
+        if not line or line.startswith("#") or line.startswith("!"):
+            continue
+        if "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        properties[key.strip()] = value.strip()
 
-    return None
+    return properties
 
 
-def configure_linux_credentials():
-    environment_path = linux_environment_path()
-    stored_token = read_linux_environment_token(environment_path)
-    if stored_token:
-        print(f"Using existing credential file: {environment_path}")
-        return os.environ.get("GITHUB_TOKEN") or stored_token
+def configure_credentials(properties_path):
+    properties = read_properties(properties_path)
+    token = properties.get("github.token")
+    if token:
+        print(f"Preserving existing credentials: {properties_path}")
+        return True
 
-    token = os.environ.get("GITHUB_TOKEN")
+    print()
+    print("GHTraffic needs a GitHub access token to collect traffic statistics.")
+    print("The token will be stored only in the local properties file:")
+    print(properties_path)
+    token = getpass.getpass("GitHub access token (leave blank to skip): ").strip()
     if not token:
-        print(
-            f"GITHUB_TOKEN is not configured. Scheduled collection will require "
-            f"it in {environment_path}."
-        )
-        return None
+        print("No token supplied; initial and scheduled collection will not authenticate yet.")
+        return False
 
-    if prompt_yes_no(
-        f"Save the current GITHUB_TOKEN in {environment_path} for scheduled collection?"
-    ):
-        environment_path.parent.mkdir(parents=True, exist_ok=True)
-        environment_path.write_text(f"GITHUB_TOKEN={token}\n", encoding="utf-8")
-        environment_path.chmod(0o600)
-        print(f"Saved GITHUB_TOKEN in {environment_path}.")
-    else:
-        print(
-            "GITHUB_TOKEN was not persisted. The initial collection can use the "
-            "current shell value, but scheduled collection may not authenticate."
-        )
-
-    return token
+    properties_path.parent.mkdir(parents=True, exist_ok=True)
+    properties_path.write_text(f"github.token={token}\n", encoding="utf-8")
+    if sys.platform != "win32" and sys.platform != "cygwin":
+        properties_path.chmod(0o600)
+    print(f"Saved credentials: {properties_path}")
+    return True
 
 
 def windows_user_sid():
@@ -210,6 +174,42 @@ def windows_user_sid():
     if len(row) < 2 or not row[1]:
         raise RuntimeError("could not determine the current Windows user SID")
     return row[1]
+
+
+def native_windows_python():
+    if sys.platform == "win32":
+        return str(Path(sys.executable))
+
+    launcher = shutil.which("py.exe")
+    if launcher:
+        result = subprocess.run(
+            [launcher, "-3", "-c", "import sys; print(sys.executable)"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        python = result.stdout.strip()
+        if python:
+            return python
+
+    result = subprocess.run(
+        ["where.exe", "python"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    candidates = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+    for candidate in candidates:
+        if "WindowsApps" not in candidate:
+            return candidate
+
+    raise RuntimeError("native Windows python.exe was not found")
+
+
+def native_windows_path(path):
+    if sys.platform == "cygwin":
+        return cygwin_path(path, "-w")
+    return str(path)
 
 
 def windows_task_xml(user_sid, command, arguments, working_directory, trigger_xml):
@@ -257,8 +257,9 @@ def stop_windows_task(name):
 def register_windows_task(name, xml):
     xml_path = Path(tempfile.gettempdir()) / f"{name.replace(' ', '_')}.xml"
     xml_path.write_text(xml, encoding="utf-16")
+    native_xml_path = native_windows_path(xml_path)
     try:
-        run(["schtasks", "/Create", "/TN", name, "/XML", str(xml_path), "/F"])
+        run(["schtasks", "/Create", "/TN", name, "/XML", native_xml_path, "/F"])
     finally:
         try:
             xml_path.unlink()
@@ -268,7 +269,10 @@ def register_windows_task(name, xml):
 
 def install_windows_tasks(app_dir):
     user_sid = windows_user_sid()
-    python = Path(sys.executable)
+    python = native_windows_python()
+    native_app_dir = native_windows_path(app_dir)
+    native_collector = native_windows_path(app_dir / "ghtraffic.py")
+    native_ui = native_windows_path(app_dir / "ghtraffic_ui.py")
     start = datetime.now().astimezone() + timedelta(minutes=5)
     start_boundary = start.isoformat(timespec="seconds")
 
@@ -288,15 +292,15 @@ def install_windows_tasks(app_dir):
     collector_xml = windows_task_xml(
         user_sid,
         python,
-        f'"{app_dir / "ghtraffic.py"}" collect',
-        app_dir,
+        f'"{native_collector}" collect',
+        native_app_dir,
         collector_trigger,
     )
     ui_xml = windows_task_xml(
         user_sid,
         python,
-        f'"{app_dir / "ghtraffic_ui.py"}"',
-        app_dir,
+        f'"{native_ui}"',
+        native_app_dir,
         ui_trigger,
     )
 
@@ -323,7 +327,6 @@ Description=GHTraffic repository traffic collector
 
 [Service]
 Type=oneshot
-EnvironmentFile=-%h/.config/ghtraffic/environment
 WorkingDirectory={systemd_quote(app_dir)}
 ExecStart={systemd_quote(sys.executable)} {systemd_quote(app_dir / "ghtraffic.py")} collect
 '''
@@ -371,18 +374,22 @@ WantedBy=default.target
     run(["systemctl", "--user", "restart", "ghtraffic-ui.service"])
 
 
-def run_initial_collection(app_dir, token):
-    if not token:
-        print("No GITHUB_TOKEN is available; skipping initial collection.")
+def run_initial_collection(app_dir, credentials_available):
+    if not credentials_available:
+        print("No GitHub token is configured; skipping initial collection.")
         return
 
     print("Running initial collection...")
-    environment = os.environ.copy()
-    environment["GITHUB_TOKEN"] = token
-    result = subprocess.run(
-        [sys.executable, str(app_dir / "ghtraffic.py"), "collect"],
-        env=environment,
-    )
+    if sys.platform == "cygwin":
+        command = [
+            native_windows_python(),
+            native_windows_path(app_dir / "ghtraffic.py"),
+            "collect",
+        ]
+    else:
+        command = [sys.executable, str(app_dir / "ghtraffic.py"), "collect"]
+
+    result = subprocess.run(command)
     if result.returncode != 0:
         print("Initial collection failed; scheduled collection is still configured.")
 
@@ -392,26 +399,27 @@ def main():
     verify_sources()
 
     if sys.platform in ("win32", "cygwin"):
-        app_dir, db_path = windows_paths()
+        app_dir, db_path, properties_path = windows_paths()
         install_files(app_dir)
         initialize_database(db_path)
-        token = configure_windows_credentials()
+        credentials_available = configure_credentials(properties_path)
         install_windows_tasks(app_dir)
-        run_initial_collection(app_dir, token)
+        run_initial_collection(app_dir, credentials_available)
         run(["schtasks", "/Run", "/TN", "GHTraffic UI"])
     elif sys.platform.startswith("linux"):
-        app_dir, db_path = linux_paths()
+        app_dir, db_path, properties_path = linux_paths()
         install_files(app_dir)
         initialize_database(db_path)
-        token = configure_linux_credentials()
+        credentials_available = configure_credentials(properties_path)
         install_linux_units(app_dir)
-        run_initial_collection(app_dir, token)
+        run_initial_collection(app_dir, credentials_available)
     else:
         raise RuntimeError(f"unsupported operating system: {sys.platform}")
 
     print()
     print("GHTraffic installation complete.")
     print(f"Database: {db_path}")
+    print(f"Properties: {properties_path}")
     print("User interface: http://127.0.0.1:8501")
 
 
