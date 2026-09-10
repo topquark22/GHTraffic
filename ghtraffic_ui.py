@@ -13,7 +13,7 @@ from urllib.parse import parse_qs, urlparse
 PROPERTIES_FILENAME = "ghtraffic.properties"
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 HOST = "127.0.0.1"
-PORT = 8501
+DEFAULT_PORT = 8501
 
 
 def windows_app_dir():
@@ -80,6 +80,22 @@ def database_path():
         return Path(result.stdout.strip())
 
     return Path(value).expanduser()
+
+
+def ui_port():
+    properties_path = default_properties_path()
+    properties = load_properties(properties_path)
+    value = properties.get("ui.port", str(DEFAULT_PORT))
+
+    try:
+        port = int(value)
+    except ValueError as error:
+        raise RuntimeError(f"ui.port must be an integer: {value}") from error
+
+    if not 1 <= port <= 65535:
+        raise RuntimeError(f"ui.port must be between 1 and 65535: {port}")
+
+    return port
 
 
 def connect_db():
@@ -245,7 +261,7 @@ INDEX_HTML = """<!doctype html>
       <a href="https://github.com/topquark22/GHTraffic/" target="_blank">topquark22</a>
     </small>
   </p>
-  
+
   <script>
     const pageTitle = document.getElementById('pageTitle');
     const repositorySelect = document.getElementById('repository');
@@ -440,8 +456,9 @@ class RequestHandler(BaseHTTPRequestHandler):
 
 
 def main():
-    server = ThreadingHTTPServer((HOST, PORT), RequestHandler)
-    print(f"GHTraffic UI: http://{HOST}:{PORT}")
+    port = ui_port()
+    server = ThreadingHTTPServer((HOST, port), RequestHandler)
+    print(f"GHTraffic UI: http://{HOST}:{port}")
 
     try:
         server.serve_forever()

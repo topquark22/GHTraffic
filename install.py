@@ -13,6 +13,8 @@ from pathlib import Path
 
 DB_FILENAME = "github_traffic.db"
 PROPERTIES_FILENAME = "ghtraffic.properties"
+DEFAULT_GITHUB_API = "https://api.github.com"
+DEFAULT_UI_PORT = 8501
 SOURCE_DIR = Path(__file__).resolve().parent
 
 
@@ -146,6 +148,28 @@ def configure_properties(properties_path, default_db_path):
         append_property(properties_path, "database.path", db_path)
         print(f"Saved database path: {db_path}")
 
+    github_api = properties.get("github.api")
+    if github_api:
+        print(f"Preserving configured GitHub API: {github_api}")
+    else:
+        github_api = DEFAULT_GITHUB_API
+        append_property(properties_path, "github.api", github_api)
+        print(f"Saved GitHub API: {github_api}")
+
+    ui_port_value = properties.get("ui.port")
+    if ui_port_value:
+        try:
+            ui_port = int(ui_port_value)
+        except ValueError as error:
+            raise RuntimeError(f"ui.port must be an integer: {ui_port_value}") from error
+        if not 1 <= ui_port <= 65535:
+            raise RuntimeError(f"ui.port must be between 1 and 65535: {ui_port}")
+        print(f"Preserving configured UI port: {ui_port}")
+    else:
+        ui_port = DEFAULT_UI_PORT
+        append_property(properties_path, "ui.port", ui_port)
+        print(f"Saved UI port: {ui_port}")
+
     token = properties.get("github.token")
     if token:
         print(f"Preserving existing credentials: {properties_path}")
@@ -164,7 +188,7 @@ def configure_properties(properties_path, default_db_path):
     if sys.platform != "win32" and properties_path.exists():
         properties_path.chmod(0o600)
 
-    return db_path
+    return db_path, ui_port
 
 
 def windows_user_id():
@@ -372,14 +396,14 @@ def main():
     if sys.platform == "win32":
         app_dir, default_db_path, properties_path = windows_paths()
         install_files(app_dir)
-        db_path = configure_properties(properties_path, default_db_path)
+        db_path, ui_port = configure_properties(properties_path, default_db_path)
         initialize_database(db_path)
         install_windows_tasks()
         run(["schtasks.exe", "/Run", "/TN", "GHTraffic UI"])
     elif sys.platform.startswith("linux"):
         app_dir, default_db_path, properties_path = linux_paths()
         install_files(app_dir)
-        db_path = configure_properties(properties_path, default_db_path)
+        db_path, ui_port = configure_properties(properties_path, default_db_path)
         initialize_database(db_path)
         install_linux_units(app_dir)
     else:
@@ -389,7 +413,7 @@ def main():
     print("GHTraffic installation complete.")
     print(f"Database: {db_path}")
     print(f"Properties: {properties_path}")
-    print("User interface: http://127.0.0.1:8501")
+    print(f"User interface: http://127.0.0.1:{ui_port}")
 
 
 if __name__ == "__main__":

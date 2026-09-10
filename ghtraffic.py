@@ -14,7 +14,7 @@ from urllib.request import Request, urlopen
 
 
 PROPERTIES_FILENAME = "ghtraffic.properties"
-GITHUB_API = "https://api.github.com"
+DEFAULT_GITHUB_API = "https://api.github.com"
 REQUIRED_TABLES = {
     "repositories",
     "repository_names",
@@ -101,6 +101,12 @@ def github_token():
     return token
 
 
+def github_api():
+    properties_path = default_properties_path()
+    properties = load_properties(properties_path)
+    return properties.get("github.api", DEFAULT_GITHUB_API).rstrip("/")
+
+
 def connect_db(db_path):
     connection = sqlite3.connect(db_path)
     connection.execute("PRAGMA foreign_keys = ON")
@@ -121,7 +127,7 @@ def verify_schema(connection):
 
 def github_get(path, token):
     request = Request(
-        f"{GITHUB_API}{path}",
+        f"{github_api()}{path}",
         headers={
             "Accept": "application/vnd.github+json",
             "Authorization": f"Bearer {token}",
