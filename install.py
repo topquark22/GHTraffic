@@ -11,7 +11,7 @@ import subprocess
 import sys
 import tempfile
 from datetime import datetime, timedelta
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 
 DB_FILENAME = "ghtraffic.db"
@@ -48,14 +48,24 @@ def verify_python():
     print(f"SQLite: {sqlite3.sqlite_version}")
 
 
-def cygwin_path(path, option):
-    result = subprocess.run(
-        ["cygpath", option, str(path)],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    return result.stdout.strip()
+def cygwin_posix_path(path):
+    windows_path = PureWindowsPath(str(path))
+    drive = windows_path.drive.rstrip(":").lower()
+    if not drive:
+        raise RuntimeError(f"Windows path has no drive letter: {path}")
+
+    parts = windows_path.parts[1:]
+    return Path("/cygdrive") / drive / Path(*parts)
+
+
+def cygwin_windows_path(path):
+    path = Path(path)
+    parts = path.parts
+    if len(parts) >= 4 and parts[0] == "/" and parts[1] == "cygdrive":
+        drive = parts[2].upper()
+        return str(PureWindowsPath(f"{drive}:/", *parts[3:]))
+
+    raise RuntimeError(f"cannot convert Cygwin path to Windows path: {path}")
 
 
 def windows_paths():
@@ -64,7 +74,7 @@ def windows_paths():
         raise RuntimeError("LOCALAPPDATA is not set")
 
     if sys.platform == "cygwin":
-        app_dir = Path(cygwin_path(local_app_data, "-u")) / "GHTraffic"
+        app_dir = cygwin_posix_path(local_app_data) / "GHTraffic"
     else:
         app_dir = Path(local_app_data) / "GHTraffic"
 
@@ -208,7 +218,7 @@ def native_windows_python():
 
 def native_windows_path(path):
     if sys.platform == "cygwin":
-        return cygwin_path(path, "-w")
+        return cygwin_windows_path(path)
     return str(path)
 
 
@@ -247,7 +257,7 @@ def windows_task_xml(user_sid, command, arguments, working_directory, trigger_xm
 
 def stop_windows_task(name):
     subprocess.run(
-        ["schtasks", "/End", "/TN", name],
+        ["schtasks.exe", "/End", "/TN", name],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         check=False,
@@ -259,7 +269,7 @@ def register_windows_task(name, xml):
     xml_path.write_text(xml, encoding="utf-16")
     native_xml_path = native_windows_path(xml_path)
     try:
-        run(["schtasks", "/Create", "/TN", name, "/XML", native_xml_path, "/F"])
+        run(["schtasks.exe", "/Create", "/TN", name, "/XML", native_xml_path, "/F"])
     finally:
         try:
             xml_path.unlink()
@@ -405,7 +415,7 @@ def main():
         credentials_available = configure_credentials(properties_path)
         install_windows_tasks(app_dir)
         run_initial_collection(app_dir, credentials_available)
-        run(["schtasks", "/Run", "/TN", "GHTraffic UI"])
+        run(["schtasks.exe", "/Run", "/TN", "GHTraffic UI"])
     elif sys.platform.startswith("linux"):
         app_dir, db_path, properties_path = linux_paths()
         install_files(app_dir)
