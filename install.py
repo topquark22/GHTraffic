@@ -235,6 +235,10 @@ def register_windows_task(name, xml):
 def install_windows_tasks(app_dir):
     user_id = windows_user_id()
     python = Path(sys.executable)
+    pythonw = python.with_name("pythonw.exe")
+    if not pythonw.exists():
+        raise RuntimeError(f"pythonw.exe was not found next to python.exe: {pythonw}")
+
     start = datetime.now().astimezone() + timedelta(minutes=5)
     start_boundary = start.isoformat(timespec="seconds")
 
@@ -260,7 +264,7 @@ def install_windows_tasks(app_dir):
     )
     ui_xml = windows_task_xml(
         user_id,
-        python,
+        pythonw,
         f'"{app_dir / "ghtraffic_ui.py"}"',
         app_dir,
         ui_trigger,
