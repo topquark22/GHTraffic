@@ -261,7 +261,7 @@ def install_windows_tasks():
         raise RuntimeError(f"pythonw.exe was not found next to python.exe: {pythonw}")
 
     task_app_dir = r"%LOCALAPPDATA%\GHTraffic"
-    start = datetime.now().astimezone() + timedelta(minutes=5)
+    start = datetime.now().astimezone() + timedelta(minutes=1)
     start_boundary = start.isoformat(timespec="seconds")
 
     collector_trigger = f'''<TimeTrigger>
