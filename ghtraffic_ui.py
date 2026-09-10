@@ -10,46 +10,80 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 
-DB_FILENAME = "ghtraffic.db"
+PROPERTIES_FILENAME = "ghtraffic.properties"
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 HOST = "127.0.0.1"
 PORT = 8501
 
 
-def default_db_path():
-    override = os.environ.get("GHTRAFFIC_DB")
-    if override:
-        return Path(override).expanduser()
-
-    if sys.platform == "win32":
-        local_app_data = os.environ.get("LOCALAPPDATA")
-        if not local_app_data:
-            raise RuntimeError("LOCALAPPDATA is not set")
-
-        return Path(local_app_data) / "GHTraffic" / DB_FILENAME
+def windows_app_dir():
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    if not local_app_data:
+        raise RuntimeError("LOCALAPPDATA is not set")
 
     if sys.platform == "cygwin":
-        local_app_data = os.environ.get("LOCALAPPDATA")
-        if not local_app_data:
-            raise RuntimeError("LOCALAPPDATA is not set")
-
         result = subprocess.run(
             ["cygpath", "-u", local_app_data],
             check=True,
             capture_output=True,
             text=True,
         )
-        return Path(result.stdout.strip()) / "GHTraffic" / DB_FILENAME
+        return Path(result.stdout.strip()) / "GHTraffic"
 
-    data_home = os.environ.get("XDG_DATA_HOME")
-    if data_home:
-        return Path(data_home).expanduser() / "ghtraffic" / DB_FILENAME
+    return Path(local_app_data) / "GHTraffic"
 
-    return Path.home() / ".local" / "share" / "ghtraffic" / DB_FILENAME
+
+def default_properties_path():
+    if sys.platform in ("win32", "cygwin"):
+        return windows_app_dir() / PROPERTIES_FILENAME
+
+    config_home = os.environ.get("XDG_CONFIG_HOME")
+    if config_home:
+        return Path(config_home).expanduser() / "ghtraffic" / PROPERTIES_FILENAME
+
+    return Path.home() / ".config" / "ghtraffic" / PROPERTIES_FILENAME
+
+
+def load_properties(path):
+    if not path.exists():
+        raise RuntimeError(f"properties file does not exist: {path}")
+
+    properties = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or line.startswith("!"):
+            continue
+        if "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        properties[key.strip()] = value.strip()
+
+    return properties
+
+
+def database_path():
+    properties_path = default_properties_path()
+    properties = load_properties(properties_path)
+    value = properties.get("database.path")
+    if not value:
+        raise RuntimeError(
+            f"database.path is not set in properties file: {properties_path}"
+        )
+
+    if sys.platform == "cygwin":
+        result = subprocess.run(
+            ["cygpath", "-u", value],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        return Path(result.stdout.strip())
+
+    return Path(value).expanduser()
 
 
 def connect_db():
-    db_path = default_db_path()
+    db_path = database_path()
     if not db_path.exists():
         raise RuntimeError(f"Database does not exist: {db_path}")
 
