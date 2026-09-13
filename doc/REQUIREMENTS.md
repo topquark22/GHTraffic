@@ -274,7 +274,11 @@ Repository selection shall use the current repository name from `repository_name
 
 For the selected repository, the user interface shall display daily views, clones, and unique cloners as a bar chart.
 
-Unique Cloners shall be displayed as a green bar series.
+The bar series shall use the following colours:
+
+- Views: light blue
+- Clones: pink
+- Unique Cloners: light green
 
 The user interface shall provide a control for selecting the reporting period. The default reporting period shall be 14 days.
 
