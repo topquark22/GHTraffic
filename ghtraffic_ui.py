@@ -133,7 +133,7 @@ def get_traffic(repository_id, days):
     with connect_db() as connection:
         rows = connection.execute(
             """
-            SELECT traffic_date, views, clones
+            SELECT traffic_date, views, clones, unique_cloners
             FROM daily_traffic
             WHERE repository_id = ?
               AND traffic_date >= date('now', ?)
@@ -308,6 +308,7 @@ INDEX_HTML = """<!doctype html>
       const labels = traffic.map(row => row.traffic_date);
       const views = traffic.map(row => row.views);
       const clones = traffic.map(row => row.clones);
+      const uniqueCloners = traffic.map(row => row.unique_cloners);
 
       if (chart) {
         chart.destroy();
@@ -318,8 +319,9 @@ INDEX_HTML = """<!doctype html>
         data: {
           labels,
           datasets: [
-            { label: 'Views', data: views },
-            { label: 'Clones', data: clones }
+            { label: 'Views', data: views, backgroundColor: 'lightblue' },
+            { label: 'Clones', data: clones, backgroundColor: 'pink' },
+            { label: 'Unique Cloners', data: uniqueCloners, backgroundColor: 'lightgreen' }
           ]
         },
         options: {
