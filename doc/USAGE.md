@@ -79,6 +79,25 @@ The `referrers` command shows the most recently collected referrer snapshot for 
 
 GitHub supplies referrer statistics as a rolling aggregate rather than daily historical values. The `As of` date identifies when GHTraffic observed the snapshot; it is not the date on which the referred traffic occurred.
 
+## Export traffic to CSV
+
+In the web user interface, select the repository and reporting period, then click **Export CSV**.
+
+The CSV contains the traffic data currently displayed for that repository and period, with the columns:
+
+- `Date`
+- `Views`
+- `Clones`
+- `Unique Cloners`
+
+The downloaded filename identifies the selected repository and period. For example, exporting 30 days for a repository named `Snarkypuss` produces:
+
+```text
+Snarkypuss-traffic-30d.csv
+```
+
+Only dates present in the local GHTraffic database are exported; missing historical dates are not synthesized as zero-valued rows.
+
 ## Use another database
 
 The normal database path is configured in `ghtraffic.properties`. A typical Linux value is:

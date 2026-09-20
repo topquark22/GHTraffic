@@ -296,3 +296,16 @@ The referrer display shall include:
 - the collection date, identified as "As of"
 
 The collection date shall not be presented as the date on which the underlying referred traffic occurred.
+
+### 5. CSV export
+
+The user interface shall provide an `Export CSV` control for the traffic data currently displayed for the selected repository and reporting period.
+
+The exported CSV shall contain one row per displayed traffic date and shall include:
+
+- Date
+- Views
+- Clones
+- Unique Cloners
+
+The export filename shall identify the selected repository and reporting period in the form `<repository>-traffic-<days>d.csv`.
