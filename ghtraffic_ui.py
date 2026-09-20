@@ -194,6 +194,10 @@ INDEX_HTML = """<!doctype html>
       min-width: 180px;
       padding: 0.4rem;
     }
+    button {
+      align-self: end;
+      padding: 0.4rem 0.8rem;
+    }
     .chart-container {
       height: 420px;
       margin-bottom: 2rem;
@@ -234,6 +238,7 @@ INDEX_HTML = """<!doctype html>
         <option value="90">90 days</option>
       </select>
     </label>
+    <button id="exportCsv" type="button">Export CSV</button>
   </div>
 
   <h2>Views and clones</h2>
@@ -269,7 +274,9 @@ INDEX_HTML = """<!doctype html>
     const referrerTable = document.getElementById('referrerTable');
     const referrerBody = referrerTable.querySelector('tbody');
     const referrerMessage = document.getElementById('referrerMessage');
+    const exportCsvButton = document.getElementById('exportCsv');
     let chart = null;
+    let displayedTraffic = [];
 
     async function loadRepositories(preserveSelection = false) {
       const selectedRepository = preserveSelection ? repositorySelect.value : null;
@@ -304,6 +311,7 @@ INDEX_HTML = """<!doctype html>
       const days = daysSelect.value;
       const response = await fetch(`/api/traffic?repository_id=${repositoryId}&days=${days}`);
       const traffic = await response.json();
+      displayedTraffic = traffic;
 
       const labels = traffic.map(row => row.traffic_date);
       const views = traffic.map(row => row.views);
@@ -375,8 +383,34 @@ INDEX_HTML = """<!doctype html>
       await Promise.all([loadTraffic(), loadReferrers()]);
     }
 
+    function exportCsv() {
+      if (displayedTraffic.length === 0) {
+        return;
+      }
+
+      const rows = [
+        ['Date', 'Views', 'Clones', 'Unique Cloners'],
+        ...displayedTraffic.map(row => [
+          row.traffic_date,
+          row.views,
+          row.clones,
+          row.unique_cloners
+        ])
+      ];
+      const csv = rows.map(row => row.join(',')).join('\n') + '\n';
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const repositoryName = repositorySelect.options[repositorySelect.selectedIndex].text;
+      link.href = url;
+      link.download = `${repositoryName}-traffic-${daysSelect.value}d.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+    }
+
     repositorySelect.addEventListener('change', refresh);
     daysSelect.addEventListener('change', () => loadRepositories(true));
+    exportCsvButton.addEventListener('click', exportCsv);
 
     loadRepositories();
   </script>
