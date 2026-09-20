@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import csv
 import json
 import os
 import sqlite3
@@ -469,6 +470,54 @@ def show(connection, days):
     return 0
 
 
+def export_csv(connection, repository, days, output_path):
+    repository_row = connection.execute(
+        """
+        SELECT repository_id, repository_name
+        FROM repository_names
+        WHERE valid_to IS NULL
+          AND (repository_name = ? OR full_name = ?)
+        """,
+        (repository, repository),
+    ).fetchone()
+
+    if repository_row is None:
+        raise RuntimeError(f"repository not found: {repository}")
+
+    repository_id, repository_name = repository_row
+    rows = connection.execute(
+        """
+        SELECT traffic_date, views, clones, unique_cloners
+        FROM daily_traffic
+        WHERE repository_id = ?
+          AND traffic_date >= date('now', ?)
+        ORDER BY traffic_date
+        """,
+        (repository_id, f"-{days - 1} days"),
+    ).fetchall()
+
+    if not rows:
+        print(
+            f"No traffic data for {repository_name} "
+            f"in the last {days} days.",
+            file=sys.stderr,
+        )
+        return 1
+
+    if output_path is None:
+        output_path = Path(f"{repository_name}-traffic-{days}d.csv")
+    else:
+        output_path = output_path.expanduser()
+
+    with output_path.open("w", encoding="utf-8", newline="") as csv_file:
+        writer = csv.writer(csv_file)
+        writer.writerow(["Date", "Views", "Clones", "Unique Cloners"])
+        writer.writerows(rows)
+
+    print(f"Wrote {output_path}")
+    return 0
+
+
 def show_referrers(connection):
     rows = connection.execute(
         """
@@ -561,6 +610,28 @@ def parse_args():
         help="number of days to show (default: 14)",
     )
 
+    export_parser = subparsers.add_parser(
+        "export-csv",
+        help="export repository traffic to CSV",
+    )
+    export_parser.add_argument(
+        "repository",
+        help="repository name or owner/name",
+    )
+    export_parser.add_argument(
+        "days",
+        nargs="?",
+        type=positive_int,
+        default=14,
+        help="number of days to export (default: 14)",
+    )
+    export_parser.add_argument(
+        "-o",
+        "--output",
+        type=Path,
+        help="output CSV path",
+    )
+
     return parser.parse_args()
 
 
@@ -580,6 +651,13 @@ def main():
                 return collect(connection)
             if args.command == "show":
                 return show(connection, args.days)
+            if args.command == "export-csv":
+                return export_csv(
+                    connection,
+                    args.repository,
+                    args.days,
+                    args.output,
+                )
             if args.command == "referrers":
                 return show_referrers(connection)
     except (OSError, sqlite3.Error, RuntimeError, subprocess.CalledProcessError) as error:

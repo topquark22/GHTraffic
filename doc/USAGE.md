@@ -1,6 +1,6 @@
 # GHTraffic Command-Line Usage
 
-GHTraffic provides three command-line commands through `ghtraffic.py`: `collect`, `show`, and `referrers`.
+GHTraffic provides four command-line commands through `ghtraffic.py`: `collect`, `show`, `referrers`, and `export-csv`.
 
 By default, the program reads the SQLite database location from `database.path` in the per-user `ghtraffic.properties` file. It does not look for a properties file in the current directory or beside `ghtraffic.py`.
 
@@ -81,20 +81,44 @@ GitHub supplies referrer statistics as a rolling aggregate rather than daily his
 
 ## Export traffic to CSV
 
+### Web user interface
+
 In the web user interface, select the repository and reporting period, then click **Export CSV**.
 
-The CSV contains the traffic data currently displayed for that repository and period, with the columns:
+### Command line
+
+The same daily traffic data can be exported from the command line with:
+
+```bash
+python ghtraffic.py export-csv Snarkypuss
+```
+
+The default reporting period is 14 days. To export another period, supply the number of days:
+
+```bash
+python ghtraffic.py export-csv Snarkypuss 30
+```
+
+The repository may be given as either its current repository name or full `owner/name`.
+
+By default, the CLI uses the same filename format as the web UI. For example, exporting 30 days for `Snarkypuss` writes:
+
+```text
+Snarkypuss-traffic-30d.csv
+```
+
+Use `--output` (or `-o`) to select another path:
+
+```bash
+python ghtraffic.py export-csv Snarkypuss 30 --output traffic.csv
+```
+
+Both the web and CLI exports contain:
 
 - `Date`
 - `Views`
 - `Clones`
 - `Unique Cloners`
-
-The downloaded filename identifies the selected repository and period. For example, exporting 30 days for a repository named `Snarkypuss` produces:
-
-```text
-Snarkypuss-traffic-30d.csv
-```
 
 Only dates present in the local GHTraffic database are exported; missing historical dates are not synthesized as zero-valued rows.
 
@@ -112,6 +136,7 @@ The `--db` option selects an explicit SQLite database file for a single command 
 python ghtraffic.py --db ./github_traffic.db show
 python ghtraffic.py --db ./github_traffic.db show 30
 python ghtraffic.py --db ./github_traffic.db referrers
+python ghtraffic.py --db ./github_traffic.db export-csv Snarkypuss 30
 python ghtraffic.py --db ./github_traffic.db collect
 ```
 

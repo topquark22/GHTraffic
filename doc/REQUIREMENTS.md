@@ -127,6 +127,19 @@ Daily unique visitor and unique cloner counts shall not be represented as true m
 
 The application shall provide a `referrers` command that reports the most recently collected referrer data for each repository. The collection date shall be presented as the date the values were observed ("As of"), not as the date on which the underlying traffic occurred.
 
+The application shall provide an `export-csv <repository> [days]` command that exports daily traffic for the selected repository from the local database. The repository may be identified by its current repository name or full `owner/name`.
+
+When `days` is omitted, `export-csv` shall export the most recent 14 days. The command shall export only dates present in the local database and shall not synthesize zero-valued rows for missing dates.
+
+The CSV shall contain the same traffic columns as the user-interface export:
+
+- Date
+- Views
+- Clones
+- Unique Cloners
+
+Unless an explicit output path is supplied, the CLI export filename shall use the form `<repository>-traffic-<days>d.csv`.
+
 ### 8. Scheduling
 
 Scheduling shall be external to the core collector so the program can be run manually or by an operating-system scheduler.
