@@ -397,7 +397,7 @@ INDEX_HTML = """<!doctype html>
           row.unique_cloners
         ])
       ];
-      const csv = rows.map(row => row.join(',')).join('\n') + '\n';
+      const csv = rows.map(row => row.join(',')).join('\\n') + '\\n';
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
