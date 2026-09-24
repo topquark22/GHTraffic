@@ -112,13 +112,15 @@ def get_repositories(days):
     with connect_db() as connection:
         rows = connection.execute(
             """
-            SELECT n.repository_id, n.owner_login, n.repository_name
+            SELECT n.repository_id, n.owner_login, n.repository_name, r.is_private
             FROM repository_names AS n
+            JOIN repositories AS r
+                ON r.repository_id = n.repository_id
             LEFT JOIN daily_traffic AS t
                 ON t.repository_id = n.repository_id
                AND t.traffic_date >= date('now', ?)
             WHERE n.valid_to IS NULL
-            GROUP BY n.repository_id, n.owner_login, n.repository_name
+            GROUP BY n.repository_id, n.owner_login, n.repository_name, r.is_private
             HAVING COALESCE(SUM(t.views), 0) > 0
                 OR COALESCE(SUM(t.clones), 0) > 0
             ORDER BY COALESCE(SUM(t.views), 0) DESC, n.repository_name COLLATE NOCASE
@@ -190,6 +192,12 @@ INDEX_HTML = """<!doctype html>
       flex-direction: column;
       gap: 0.3rem;
     }
+    .checkbox-label {
+      align-self: end;
+      flex-direction: row;
+      align-items: center;
+      padding-bottom: 0.4rem;
+    }
     select {
       min-width: 180px;
       padding: 0.4rem;
@@ -238,6 +246,10 @@ INDEX_HTML = """<!doctype html>
         <option value="90">90 days</option>
       </select>
     </label>
+    <label class="checkbox-label">
+      <input id="showPrivate" type="checkbox">
+      Show private repositories
+    </label>
     <button id="exportCsv" type="button">Export CSV</button>
   </div>
 
@@ -275,6 +287,7 @@ INDEX_HTML = """<!doctype html>
     const referrerBody = referrerTable.querySelector('tbody');
     const referrerMessage = document.getElementById('referrerMessage');
     const exportCsvButton = document.getElementById('exportCsv');
+    const showPrivateCheckbox = document.getElementById('showPrivate');
     let chart = null;
     let displayedTraffic = [];
 
@@ -282,7 +295,10 @@ INDEX_HTML = """<!doctype html>
       const selectedRepository = preserveSelection ? repositorySelect.value : null;
       const days = daysSelect.value;
       const response = await fetch(`/api/repositories?days=${days}`);
-      const repositories = await response.json();
+      const allRepositories = await response.json();
+      const repositories = showPrivateCheckbox.checked
+        ? allRepositories
+        : allRepositories.filter(repository => !repository.is_private);
 
       repositorySelect.innerHTML = '';
       for (const repository of repositories) {
@@ -410,6 +426,7 @@ INDEX_HTML = """<!doctype html>
 
     repositorySelect.addEventListener('change', refresh);
     daysSelect.addEventListener('change', () => loadRepositories(true));
+    showPrivateCheckbox.addEventListener('change', () => loadRepositories(true));
     exportCsvButton.addEventListener('click', exportCsv);
 
     loadRepositories();
