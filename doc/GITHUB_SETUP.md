@@ -52,17 +52,27 @@ If **Only select repositories** is used instead, every repository to be monitore
 
 ## 4. Repository permissions
 
-Under **Repository permissions**, grant:
+For a fine-grained personal access token, GHTraffic requires:
 
 ```text
-Administration: Read-only
+Repository permissions
+  Administration: Read-only
+  Metadata: Read-only
 ```
 
-GitHub's repository traffic endpoints for views and clones require read access to the repository **Administration** permission.
+**Administration: Read-only** is the permission GitHub requires for the repository
+traffic endpoints used by GHTraffic, including views, clones, and popular
+referrers.
 
-GHTraffic does not require write access to repositories.
+**Metadata: Read-only** is used to enumerate repositories through GitHub's
+authenticated-user repository endpoint. GitHub normally includes this permission
+automatically when repository access is granted.
 
-Leave unrelated repository permissions at their default/no-access setting unless GitHub requires an automatically included read-only metadata permission.
+No other repository permissions are required. In particular, GHTraffic does not
+need Contents, Issues, Pull requests, Actions, or any write permission.
+
+The token must also have access to every repository that GHTraffic is expected to
+monitor. Selecting **All repositories** is recommended as described above.
 
 ## 5. Generate and copy the token
 
@@ -163,3 +173,61 @@ If the token expires, is revoked, or is suspected to have been exposed:
 4. revoke the old token in GitHub.
 
 GHTraffic should always have its own token so it can be rotated or revoked without affecting unrelated GitHub tools.
+
+
+## Multiple GitHub accounts
+
+GHTraffic can collect traffic for more than one GitHub account. Keep the existing
+`github.token` entry for the first account and add additional tokens with unique
+property suffixes:
+
+```text
+github.token=github_pat_...
+github.token.work=github_pat_...
+github.token.other=github_pat_...
+```
+
+The suffix is only a local configuration key; GHTraffic determines the GitHub
+account name by authenticating each token with GitHub. The web interface presents
+one **Account** dropdown entry for each token property, labelled with both the
+discovered GitHub login and the property key. Multiple tokens for the same GitHub
+account therefore appear as separate entries and select the same repository set.
+
+Scheduled collection uses every configured token. To collect only one configured
+account manually, use:
+
+```bash
+python ghtraffic.py collect --account topquark22
+```
+
+Each token should have the repository access and read-only Administration
+permission described above for its own account.
+
+
+## Expired, revoked, or removed tokens
+
+Each configured token is authenticated independently during collection. If one
+token has expired, been revoked, or is otherwise invalid, GHTraffic records the
+authentication failure, reports it, continues collecting all other valid
+accounts, and exits with a failure status after the remaining work is complete.
+
+Removing or commenting out a token in `ghtraffic.properties` does not remove
+its credential record or the account's historical traffic from the database.
+The web interface rereads `ghtraffic.properties` whenever the page loads, so a
+removed or commented-out token is omitted from the Account dropdown immediately;
+a collector run is not required for that configuration change to appear.
+
+The Account dropdown contains one entry per known token property rather than one
+entry per GitHub login. This makes duplicate tokens for the same GitHub account
+visible independently, including the status of each token. Selecting either token
+for the same login displays the same repository set.
+
+A token that is still configured but fails authentication remains in the Account
+dropdown with a warning marker. A token that is no longer configured is not shown.
+Historical repository traffic and referrer data are not deleted in either case.
+With only one configured token entry, the Account dropdown remains hidden as in
+the single-account interface; an authentication failure is indicated in the page
+title instead.
+
+Replacing or restoring a valid token causes that token entry to return to normal
+status on the next successful collection.

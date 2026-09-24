@@ -24,7 +24,7 @@ Run:
 python ghtraffic.py collect
 ```
 
-The `collect` command connects to GitHub using the access token stored as `github.token` in `ghtraffic.properties`, discovers all non-fork repositories owned by the authenticated user, and collects the latest available:
+The `collect` command connects to GitHub using every access token stored as `github.token` or `github.token.<name>` in `ghtraffic.properties`, discovers all non-fork repositories owned by each authenticated user, and collects the latest available:
 
 - views and unique visitors;
 - clones and unique cloners; and
@@ -33,6 +33,16 @@ The `collect` command connects to GitHub using the access token stored as `githu
 The collected data is written to the local SQLite database configured by `database.path`. Existing daily traffic records are updated when GitHub returns revised values, so repeated collection does not create duplicate daily records.
 
 See [GITHUB_SETUP.md](GITHUB_SETUP.md) for GitHub authentication setup.
+
+To collect only one configured GitHub account, use:
+
+```bash
+python ghtraffic.py collect --account topquark22
+```
+
+The account name is the GitHub login discovered from the token; it does not need
+to match the suffix used on the corresponding property name. The web interface
+uses the same discovered owner names for its **Account** dropdown.
 
 ## Show traffic
 

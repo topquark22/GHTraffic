@@ -29,6 +29,7 @@ def verify_sources():
         SOURCE_DIR / "ghtraffic.py",
         SOURCE_DIR / "ghtraffic_ui.py",
         SOURCE_DIR / "ddl.sql",
+        SOURCE_DIR / "migrations" / "001_account_credentials.sql",
         SOURCE_DIR / "static" / "chart.umd.min.js",
         SOURCE_DIR / "static" / "favicon.ico",
     ]
@@ -106,6 +107,51 @@ def initialize_database(db_path):
         connection.close()
 
     print(f"Created database: {db_path}")
+
+
+def migrate_database(db_path):
+    migration_dir = SOURCE_DIR / "migrations"
+    migration_files = sorted(migration_dir.glob("*.sql"))
+
+    connection = sqlite3.connect(db_path)
+    try:
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS schema_migrations (
+                migration TEXT PRIMARY KEY,
+                applied_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.commit()
+
+        applied = {
+            row[0]
+            for row in connection.execute(
+                "SELECT migration FROM schema_migrations"
+            ).fetchall()
+        }
+
+        for migration_path in migration_files:
+            if migration_path.name in applied:
+                continue
+
+            sql = migration_path.read_text(encoding="utf-8")
+            connection.executescript(sql)
+            connection.execute(
+                """
+                INSERT INTO schema_migrations (migration, applied_at)
+                VALUES (?, ?)
+                """,
+                (
+                    migration_path.name,
+                    datetime.now().astimezone().isoformat(timespec="seconds"),
+                ),
+            )
+            connection.commit()
+            print(f"Applied database migration: {migration_path.name}")
+    finally:
+        connection.close()
 
 
 def read_properties(path):
@@ -401,6 +447,7 @@ def main():
         install_files(app_dir)
         db_path, ui_port = configure_properties(properties_path, default_db_path)
         initialize_database(db_path)
+        migrate_database(db_path)
         install_windows_tasks()
         run(["schtasks.exe", "/Run", "/TN", "GHTraffic UI"])
     elif sys.platform.startswith("linux"):
@@ -408,6 +455,7 @@ def main():
         install_files(app_dir)
         db_path, ui_port = configure_properties(properties_path, default_db_path)
         initialize_database(db_path)
+        migrate_database(db_path)
         install_linux_units(app_dir)
     else:
         raise RuntimeError(f"unsupported operating system: {sys.platform}")

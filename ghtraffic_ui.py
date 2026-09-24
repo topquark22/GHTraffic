@@ -98,17 +98,71 @@ def ui_port():
     return port
 
 
-def connect_db():
+def connect_db(read_only=True):
     db_path = database_path()
     if not db_path.exists():
         raise RuntimeError(f"Database does not exist: {db_path}")
 
-    connection = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+    if read_only:
+        connection = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+    else:
+        connection = sqlite3.connect(db_path)
     connection.row_factory = sqlite3.Row
     return connection
 
 
-def get_repositories(days):
+def sync_configured_tokens():
+    properties = load_properties(default_properties_path())
+    configured_keys = {
+        key
+        for key, value in properties.items()
+        if (key == "github.token" or key.startswith("github.token.")) and value
+    }
+
+    with connect_db(read_only=False) as connection:
+        connection.execute("UPDATE account_credentials SET token_present = 0")
+        for token_key in configured_keys:
+            connection.execute(
+                """
+                UPDATE account_credentials
+                SET token_present = 1
+                WHERE token_key = ?
+                """,
+                (token_key,),
+            )
+
+
+def get_accounts():
+    sync_configured_tokens()
+
+    with connect_db() as connection:
+        rows = connection.execute(
+            """
+            SELECT
+                a.token_key,
+                a.login,
+                a.token_present,
+                a.auth_ok,
+                counts.token_count
+            FROM account_credentials AS a
+            JOIN (
+                SELECT login, COUNT(*) AS token_count
+                FROM account_credentials
+                WHERE login IS NOT NULL
+                  AND token_present = 1
+                GROUP BY login
+            ) AS counts
+                ON counts.login = a.login
+            WHERE a.login IS NOT NULL
+              AND a.token_present = 1
+            ORDER BY a.token_key COLLATE NOCASE
+            """
+        ).fetchall()
+
+    return [dict(row) for row in rows]
+
+
+def get_repositories(days, account=None):
     with connect_db() as connection:
         rows = connection.execute(
             """
@@ -120,12 +174,13 @@ def get_repositories(days):
                 ON t.repository_id = n.repository_id
                AND t.traffic_date >= date('now', ?)
             WHERE n.valid_to IS NULL
+              AND (? IS NULL OR n.owner_login = ?)
             GROUP BY n.repository_id, n.owner_login, n.repository_name, r.is_private
             HAVING COALESCE(SUM(t.views), 0) > 0
                 OR COALESCE(SUM(t.clones), 0) > 0
             ORDER BY COALESCE(SUM(t.views), 0) DESC, n.repository_name COLLATE NOCASE
             """,
-            (f"-{days - 1} days",),
+            (f"-{days - 1} days", account, account),
         ).fetchall()
 
     return [dict(row) for row in rows]
@@ -233,6 +288,10 @@ INDEX_HTML = """<!doctype html>
   <h1 id="pageTitle">GitHub Traffic</h1>
 
   <div class="controls">
+    <label id="accountLabel">
+      Account
+      <select id="account"></select>
+    </label>
     <label>
       Repository
       <select id="repository"></select>
@@ -281,6 +340,8 @@ INDEX_HTML = """<!doctype html>
 
   <script>
     const pageTitle = document.getElementById('pageTitle');
+    const accountLabel = document.getElementById('accountLabel');
+    const accountSelect = document.getElementById('account');
     const repositorySelect = document.getElementById('repository');
     const daysSelect = document.getElementById('days');
     const referrerTable = document.getElementById('referrerTable');
@@ -291,10 +352,44 @@ INDEX_HTML = """<!doctype html>
     let chart = null;
     let displayedTraffic = [];
 
+    async function loadAccounts() {
+      const response = await fetch('/api/accounts');
+      const accounts = await response.json();
+
+      accountSelect.innerHTML = '';
+      for (const account of accounts) {
+        const option = document.createElement('option');
+        const available = account.token_present && account.auth_ok;
+        option.value = account.token_key;
+        option.dataset.login = account.login;
+        option.dataset.available = available ? '1' : '0';
+        const label = account.token_count > 1
+          ? `${account.login} — ${account.token_key}`
+          : account.login;
+        option.textContent = available
+          ? label
+          : `⚠ ${label} (token unavailable)`;
+        accountSelect.appendChild(option);
+      }
+
+      accountLabel.hidden = accounts.length <= 1;
+
+      if (accounts.length > 0) {
+        if (accounts.length === 1 &&
+            !(accounts[0].token_present && accounts[0].auth_ok)) {
+          pageTitle.textContent =
+            `GitHub Traffic — ${accounts[0].login} (token unavailable)`;
+        }
+        await loadRepositories();
+      }
+    }
+
     async function loadRepositories(preserveSelection = false) {
       const selectedRepository = preserveSelection ? repositorySelect.value : null;
       const days = daysSelect.value;
-      const response = await fetch(`/api/repositories?days=${days}`);
+      const accountOption = accountSelect.options[accountSelect.selectedIndex];
+      const account = encodeURIComponent(accountOption.dataset.login);
+      const response = await fetch(`/api/repositories?days=${days}&account=${account}`);
       const allRepositories = await response.json();
       const repositories = showPrivateCheckbox.checked
         ? allRepositories
@@ -309,7 +404,11 @@ INDEX_HTML = """<!doctype html>
       }
 
       if (repositories.length > 0) {
-        pageTitle.textContent = `GitHub Traffic — ${repositories[0].owner_login}`;
+        const accountOption = accountSelect.options[accountSelect.selectedIndex];
+        const unavailable = accountOption && accountOption.dataset.available === '0';
+        pageTitle.textContent = unavailable
+          ? `GitHub Traffic — ${repositories[0].owner_login} (token unavailable)`
+          : `GitHub Traffic — ${repositories[0].owner_login}`;
       }
 
       if (selectedRepository && repositories.some(
@@ -424,12 +523,13 @@ INDEX_HTML = """<!doctype html>
       URL.revokeObjectURL(url);
     }
 
+    accountSelect.addEventListener('change', () => loadRepositories());
     repositorySelect.addEventListener('change', refresh);
     daysSelect.addEventListener('change', () => loadRepositories(true));
     showPrivateCheckbox.addEventListener('change', () => loadRepositories(true));
     exportCsvButton.addEventListener('click', exportCsv);
 
-    loadRepositories();
+    loadAccounts();
   </script>
 </body>
 </html>
@@ -476,12 +576,17 @@ class RequestHandler(BaseHTTPRequestHandler):
 
             query = parse_qs(parsed.query)
 
+            if parsed.path == "/api/accounts":
+                self.send_json(get_accounts())
+                return
+
             if parsed.path == "/api/repositories":
                 days = int(query.get("days", ["14"])[0])
                 if days < 1:
                     raise ValueError("days must be at least 1")
 
-                self.send_json(get_repositories(days))
+                account = query.get("account", [None])[0]
+                self.send_json(get_repositories(days, account))
                 return
 
             if parsed.path == "/api/traffic":
