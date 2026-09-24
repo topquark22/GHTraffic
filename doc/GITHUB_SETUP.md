@@ -213,8 +213,9 @@ accounts, and exits with a failure status after the remaining work is complete.
 
 Removing or commenting out a token in `ghtraffic.properties` does not remove
 its credential record or the account's historical traffic from the database.
-After the next collection run records that the token is no longer configured,
-that token entry is omitted from the Account dropdown.
+The web interface rereads `ghtraffic.properties` whenever the page loads, so a
+removed or commented-out token is omitted from the Account dropdown immediately;
+a collector run is not required for that configuration change to appear.
 
 The Account dropdown contains one entry per known token property rather than one
 entry per GitHub login. This makes duplicate tokens for the same GitHub account

@@ -98,17 +98,43 @@ def ui_port():
     return port
 
 
-def connect_db():
+def connect_db(read_only=True):
     db_path = database_path()
     if not db_path.exists():
         raise RuntimeError(f"Database does not exist: {db_path}")
 
-    connection = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+    if read_only:
+        connection = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+    else:
+        connection = sqlite3.connect(db_path)
     connection.row_factory = sqlite3.Row
     return connection
 
 
+def sync_configured_tokens():
+    properties = load_properties(default_properties_path())
+    configured_keys = {
+        key
+        for key, value in properties.items()
+        if (key == "github.token" or key.startswith("github.token.")) and value
+    }
+
+    with connect_db(read_only=False) as connection:
+        connection.execute("UPDATE account_credentials SET token_present = 0")
+        for token_key in configured_keys:
+            connection.execute(
+                """
+                UPDATE account_credentials
+                SET token_present = 1
+                WHERE token_key = ?
+                """,
+                (token_key,),
+            )
+
+
 def get_accounts():
+    sync_configured_tokens()
+
     with connect_db() as connection:
         rows = connection.execute(
             """
