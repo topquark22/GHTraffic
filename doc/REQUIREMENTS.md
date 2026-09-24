@@ -68,12 +68,17 @@ Dates shall be stored in ISO 8601 form suitable for chronological ordering and S
 
 ### 6. Initial data model
 
-The database shall contain four tables:
+The initial database schema shall contain the repository and traffic tables:
 
 - `repositories`
 - `repository_names`
 - `daily_traffic`
 - `referral_traffic`
+
+Version 4.0.0 shall add `account_credentials` through a database migration. This
+table shall retain per-token configuration and authentication status, but shall
+not store access-token values. Applied database migrations shall be recorded in
+`schema_migrations`.
 
 The numeric GitHub repository ID shall be used directly as the canonical repository key. No separate local surrogate repository key is required.
 
@@ -162,11 +167,20 @@ A failed collection run shall not corrupt or discard previously collected traffi
 
 The application shall read local configuration from `ghtraffic.properties`.
 
-The GitHub access token property shall be named:
+The primary GitHub access token property shall be named:
 
 ```text
 github.token
 ```
+
+Additional GitHub access tokens shall be supported using distinct properties of
+the form `github.token.<name>`. Each configured token shall be authenticated
+independently, and the authenticated GitHub login shall be discovered through
+the GitHub API rather than inferred from the property suffix.
+
+Multiple configured tokens may authenticate as the same GitHub login. Such
+tokens shall remain distinct credentials for status reporting even though they
+refer to the same repository owner.
 
 The database location property shall be named:
 
@@ -198,7 +212,11 @@ The `--db` command-line option shall override `database.path` for a single `ghtr
 
 The runtime collector and user interface shall remain compatible with Cygwin and shall translate a Windows `database.path` value to a Cygwin path when necessary.
 
-Credentials shall not be stored in the SQLite database or committed to the source repository.
+Access-token values shall not be stored in the SQLite database or committed to
+the source repository. The database may retain non-secret credential metadata,
+including the token property key, authenticated login, whether the token remains
+configured, authentication status, authentication timestamps, and diagnostic
+error text.
 
 The authenticated credentials must have sufficient permission to retrieve traffic data for every repository to be monitored.
 
@@ -206,7 +224,16 @@ The authenticated credentials must have sufficient permission to retrieve traffi
 
 Failure to collect traffic for one repository shall not prevent collection from continuing for other repositories.
 
-Collection failures shall identify the affected repository and provide enough diagnostic information to determine whether the failure was caused by authentication, permissions, API limits, or another error.
+Failure to authenticate one configured access token shall not prevent collection
+through other configured tokens. An authentication failure shall be recorded
+against the affected token property without exposing the token value.
+
+A configured token that fails authentication, including an expired or revoked
+token, shall remain recorded as configured and unavailable. Removing or
+commenting out a token in `ghtraffic.properties` shall instead mark that
+credential as no longer configured without deleting historical traffic data.
+
+Collection failures shall identify the affected repository or token property and provide enough diagnostic information to determine whether the failure was caused by authentication, permissions, API limits, or another error.
 
 The application shall return a non-zero exit status when a collection run contains failures that require operator attention.
 
@@ -289,6 +316,36 @@ The UI shall not require third-party Python packages.
 The user interface shall provide a drop-down control for selecting a repository.
 
 Repository selection shall use the current repository name from `repository_names`. Historical repository names shall not appear as separate repositories.
+
+### 3. Account selection
+
+When more than one access-token entry is currently configured, the user interface
+shall provide an **Account** dropdown with one selectable row per configured
+token.
+
+Each row shall be associated internally with its token property key and
+authenticated GitHub login. If only one currently configured token maps to a
+given login, the displayed label shall omit the token property key. If multiple
+currently configured tokens map to the same login, their property keys shall be
+included in the labels so the credentials can be distinguished.
+
+A token that remains present in `ghtraffic.properties` but whose most recent
+authentication failed shall remain in the dropdown and shall be visibly marked
+as unavailable. A token that is removed or commented out in
+`ghtraffic.properties` shall not appear in the dropdown.
+
+The UI shall reread `ghtraffic.properties` when the page loads so additions,
+removals, and comments affecting token properties are reflected without waiting
+for another collector run. The UI shall not authenticate tokens during page
+load; authentication status shall come from the most recent collector run.
+
+If only one token is currently configured, the Account dropdown shall be hidden
+so the single-account presentation remains unchanged. If that token is
+configured but unavailable, the UI shall indicate the unavailable status without
+requiring the Account dropdown.
+
+Selecting different token rows that authenticate as the same GitHub login shall
+display the same repository set.
 
 ### 3. Traffic display
 
