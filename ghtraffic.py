@@ -21,6 +21,7 @@ REQUIRED_TABLES = {
     "repository_names",
     "daily_traffic",
     "referral_traffic",
+    "account_credentials",
 }
 
 
@@ -97,18 +98,13 @@ def github_tokens():
 
     token = properties.get("github.token")
     if token:
-        tokens.append(token)
+        tokens.append(("github.token", token))
 
     tokens.extend(
-        value
+        (key, value)
         for key, value in sorted(properties.items())
         if key.startswith("github.token.") and value
     )
-
-    if not tokens:
-        raise RuntimeError(
-            f"no github.token entries are set in properties file: {properties_path}"
-        )
 
     return tokens
 
@@ -384,17 +380,109 @@ def update_referrers(connection, repository_id, referrers, collected_date):
 
 
 def collect(connection, account=None):
+    configured_tokens = github_tokens()
+    attempted_account = False
     accounts = []
-    for token in github_tokens():
-        user = github_get("/user", token)
-        login = user["login"]
-        if account is None or login.casefold() == account.casefold():
-            accounts.append((login, token))
-
-    if account is not None and not accounts:
-        raise RuntimeError(f"no configured GitHub token authenticates as {account}")
-
     failures = 0
+
+    with connection:
+        connection.execute(
+            "UPDATE account_credentials SET token_present = 0"
+        )
+        for token_key, token in configured_tokens:
+            connection.execute(
+                """
+                INSERT INTO account_credentials (
+                    token_key,
+                    token_present,
+                    auth_ok
+                )
+                VALUES (?, 1, 0)
+                ON CONFLICT(token_key)
+                DO UPDATE SET token_present = 1
+                """,
+                (token_key,),
+            )
+
+    if not configured_tokens:
+        print("Error: no GitHub access tokens are configured.", file=sys.stderr)
+        return 1
+
+    for token_key, token in configured_tokens:
+        attempted_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        previous = connection.execute(
+            "SELECT login FROM account_credentials WHERE token_key = ?",
+            (token_key,),
+        ).fetchone()
+
+        try:
+            user = github_get("/user", token)
+            login = user["login"]
+            if account is not None and login.casefold() != account.casefold():
+                continue
+
+            attempted_account = True
+            with connection:
+                connection.execute(
+                    """
+                    INSERT INTO account_credentials (
+                        token_key,
+                        login,
+                        token_present,
+                        auth_ok,
+                        last_auth_attempt,
+                        last_auth_success,
+                        last_error
+                    )
+                    VALUES (?, ?, 1, 1, ?, ?, NULL)
+                    ON CONFLICT(token_key)
+                    DO UPDATE SET
+                        login             = excluded.login,
+                        token_present     = 1,
+                        auth_ok           = 1,
+                        last_auth_attempt = excluded.last_auth_attempt,
+                        last_auth_success = excluded.last_auth_success,
+                        last_error        = NULL
+                    """,
+                    (token_key, login, attempted_at, attempted_at),
+                )
+            accounts.append((login, token))
+        except RuntimeError as error:
+            previous_login = previous[0] if previous is not None else None
+            if account is not None and (
+                previous_login is None
+                or previous_login.casefold() != account.casefold()
+            ):
+                continue
+
+            attempted_account = True
+            failures += 1
+            with connection:
+                connection.execute(
+                    """
+                    INSERT INTO account_credentials (
+                        token_key,
+                        login,
+                        token_present,
+                        auth_ok,
+                        last_auth_attempt,
+                        last_error
+                    )
+                    VALUES (?, ?, 1, 0, ?, ?)
+                    ON CONFLICT(token_key)
+                    DO UPDATE SET
+                        token_present     = 1,
+                        auth_ok           = 0,
+                        last_auth_attempt = excluded.last_auth_attempt,
+                        last_error        = excluded.last_error
+                    """,
+                    (token_key, previous_login, attempted_at, str(error)),
+                )
+            print(f"Error authenticating {token_key}: {error}", file=sys.stderr)
+
+    if account is not None and not attempted_account:
+        raise RuntimeError(f"no configured GitHub token is associated with {account}")
+
     for login, token in accounts:
         repositories = get_repositories(token)
         print(f"Authenticated as {login}; found {len(repositories)} repositories.")

@@ -112,14 +112,27 @@ def get_accounts():
     with connect_db() as connection:
         rows = connection.execute(
             """
-            SELECT DISTINCT owner_login
-            FROM repository_names
-            WHERE valid_to IS NULL
-            ORDER BY owner_login COLLATE NOCASE
+            SELECT
+                n.owner_login,
+                CASE
+                    WHEN EXISTS (
+                        SELECT 1
+                        FROM account_credentials AS a
+                        WHERE a.login = n.owner_login
+                          AND a.token_present = 1
+                          AND a.auth_ok = 1
+                    )
+                    THEN 1
+                    ELSE 0
+                END AS available
+            FROM repository_names AS n
+            WHERE n.valid_to IS NULL
+            GROUP BY n.owner_login
+            ORDER BY n.owner_login COLLATE NOCASE
             """
         ).fetchall()
 
-    return [row["owner_login"] for row in rows]
+    return [dict(row) for row in rows]
 
 
 def get_repositories(days, account=None):
@@ -248,7 +261,7 @@ INDEX_HTML = """<!doctype html>
   <h1 id="pageTitle">GitHub Traffic</h1>
 
   <div class="controls">
-    <label>
+    <label id="accountLabel">
       Account
       <select id="account"></select>
     </label>
@@ -300,6 +313,7 @@ INDEX_HTML = """<!doctype html>
 
   <script>
     const pageTitle = document.getElementById('pageTitle');
+    const accountLabel = document.getElementById('accountLabel');
     const accountSelect = document.getElementById('account');
     const repositorySelect = document.getElementById('repository');
     const daysSelect = document.getElementById('days');
@@ -318,12 +332,21 @@ INDEX_HTML = """<!doctype html>
       accountSelect.innerHTML = '';
       for (const account of accounts) {
         const option = document.createElement('option');
-        option.value = account;
-        option.textContent = account;
+        option.value = account.owner_login;
+        option.dataset.available = account.available ? '1' : '0';
+        option.textContent = account.available
+          ? account.owner_login
+          : `⚠ ${account.owner_login} (token unavailable)`;
         accountSelect.appendChild(option);
       }
 
+      accountLabel.hidden = accounts.length <= 1;
+
       if (accounts.length > 0) {
+        if (accounts.length === 1 && !accounts[0].available) {
+          pageTitle.textContent =
+            `GitHub Traffic — ${accounts[0].owner_login} (token unavailable)`;
+        }
         await loadRepositories();
       }
     }
@@ -347,7 +370,11 @@ INDEX_HTML = """<!doctype html>
       }
 
       if (repositories.length > 0) {
-        pageTitle.textContent = `GitHub Traffic — ${repositories[0].owner_login}`;
+        const accountOption = accountSelect.options[accountSelect.selectedIndex];
+        const unavailable = accountOption && accountOption.dataset.available === '0';
+        pageTitle.textContent = unavailable
+          ? `GitHub Traffic — ${repositories[0].owner_login} (token unavailable)`
+          : `GitHub Traffic — ${repositories[0].owner_login}`;
       }
 
       if (selectedRepository && repositories.some(

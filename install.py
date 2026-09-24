@@ -91,10 +91,7 @@ def install_files(app_dir):
 
 
 def initialize_database(db_path):
-    if db_path.exists():
-        print(f"Preserving existing database: {db_path}")
-        return
-
+    existed = db_path.exists()
     db_path.parent.mkdir(parents=True, exist_ok=True)
     ddl = (SOURCE_DIR / "ddl.sql").read_text(encoding="utf-8")
 
@@ -105,7 +102,10 @@ def initialize_database(db_path):
     finally:
         connection.close()
 
-    print(f"Created database: {db_path}")
+    if existed:
+        print(f"Preserved and updated database schema: {db_path}")
+    else:
+        print(f"Created database: {db_path}")
 
 
 def read_properties(path):
