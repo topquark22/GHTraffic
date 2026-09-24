@@ -119,6 +119,7 @@ def get_accounts():
                 auth_ok
             FROM account_credentials
             WHERE login IS NOT NULL
+              AND token_present = 1
             ORDER BY token_key COLLATE NOCASE
             """
         ).fetchall()

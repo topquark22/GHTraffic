@@ -211,20 +211,22 @@ token has expired, been revoked, or is otherwise invalid, GHTraffic records the
 authentication failure, reports it, continues collecting all other valid
 accounts, and exits with a failure status after the remaining work is complete.
 
-Removing a token from `ghtraffic.properties` does not remove its credential
-record or the account's historical traffic from the database. The token entry
-remains selectable in the web interface, but is marked **token unavailable**.
+Removing or commenting out a token in `ghtraffic.properties` does not remove
+its credential record or the account's historical traffic from the database.
+After the next collection run records that the token is no longer configured,
+that token entry is omitted from the Account dropdown.
 
 The Account dropdown contains one entry per known token property rather than one
 entry per GitHub login. This makes duplicate tokens for the same GitHub account
 visible independently, including the status of each token. Selecting either token
 for the same login displays the same repository set.
 
-When more than one token entry exists, unavailable entries are shown in the
-Account dropdown with a warning marker. Historical repository traffic and
-referrer data remain available for selection and display. With only one token
-entry, the Account dropdown remains hidden as in the single-account interface; an
-unavailable token is indicated in the page title instead.
+A token that is still configured but fails authentication remains in the Account
+dropdown with a warning marker. A token that is no longer configured is not shown.
+Historical repository traffic and referrer data are not deleted in either case.
+With only one configured token entry, the Account dropdown remains hidden as in
+the single-account interface; an authentication failure is indicated in the page
+title instead.
 
 Replacing or restoring a valid token causes that token entry to return to normal
 status on the next successful collection.
