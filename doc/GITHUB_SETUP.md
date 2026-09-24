@@ -52,17 +52,27 @@ If **Only select repositories** is used instead, every repository to be monitore
 
 ## 4. Repository permissions
 
-Under **Repository permissions**, grant:
+For a fine-grained personal access token, GHTraffic requires:
 
 ```text
-Administration: Read-only
+Repository permissions
+  Administration: Read-only
+  Metadata: Read-only
 ```
 
-GitHub's repository traffic endpoints for views and clones require read access to the repository **Administration** permission.
+**Administration: Read-only** is the permission GitHub requires for the repository
+traffic endpoints used by GHTraffic, including views, clones, and popular
+referrers.
 
-GHTraffic does not require write access to repositories.
+**Metadata: Read-only** is used to enumerate repositories through GitHub's
+authenticated-user repository endpoint. GitHub normally includes this permission
+automatically when repository access is granted.
 
-Leave unrelated repository permissions at their default/no-access setting unless GitHub requires an automatically included read-only metadata permission.
+No other repository permissions are required. In particular, GHTraffic does not
+need Contents, Issues, Pull requests, Actions, or any write permission.
+
+The token must also have access to every repository that GHTraffic is expected to
+monitor. Selecting **All repositories** is recommended as described above.
 
 ## 5. Generate and copy the token
 
