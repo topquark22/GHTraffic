@@ -113,14 +113,23 @@ def get_accounts():
         rows = connection.execute(
             """
             SELECT
-                token_key,
-                login,
-                token_present,
-                auth_ok
-            FROM account_credentials
-            WHERE login IS NOT NULL
-              AND token_present = 1
-            ORDER BY token_key COLLATE NOCASE
+                a.token_key,
+                a.login,
+                a.token_present,
+                a.auth_ok,
+                counts.token_count
+            FROM account_credentials AS a
+            JOIN (
+                SELECT login, COUNT(*) AS token_count
+                FROM account_credentials
+                WHERE login IS NOT NULL
+                  AND token_present = 1
+                GROUP BY login
+            ) AS counts
+                ON counts.login = a.login
+            WHERE a.login IS NOT NULL
+              AND a.token_present = 1
+            ORDER BY a.token_key COLLATE NOCASE
             """
         ).fetchall()
 
@@ -328,7 +337,9 @@ INDEX_HTML = """<!doctype html>
         option.value = account.token_key;
         option.dataset.login = account.login;
         option.dataset.available = available ? '1' : '0';
-        const label = `${account.login} — ${account.token_key}`;
+        const label = account.token_count > 1
+          ? `${account.login} — ${account.token_key}`
+          : account.login;
         option.textContent = available
           ? label
           : `⚠ ${label} (token unavailable)`;
