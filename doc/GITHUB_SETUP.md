@@ -189,7 +189,9 @@ github.token.other=github_pat_...
 
 The suffix is only a local configuration key; GHTraffic determines the GitHub
 account name by authenticating each token with GitHub. The web interface presents
-the discovered account names in an **Account** dropdown.
+one **Account** dropdown entry for each token property, labelled with both the
+discovered GitHub login and the property key. Multiple tokens for the same GitHub
+account therefore appear as separate entries and select the same repository set.
 
 Scheduled collection uses every configured token. To collect only one configured
 account manually, use:
@@ -209,16 +211,20 @@ token has expired, been revoked, or is otherwise invalid, GHTraffic records the
 authentication failure, reports it, continues collecting all other valid
 accounts, and exits with a failure status after the remaining work is complete.
 
-Removing a token from `ghtraffic.properties` does not remove that account's
-historical traffic from the database. The account remains selectable in the web
-interface, but is marked **token unavailable**. An account is also marked
-unavailable when all configured tokens associated with it fail authentication.
+Removing a token from `ghtraffic.properties` does not remove its credential
+record or the account's historical traffic from the database. The token entry
+remains selectable in the web interface, but is marked **token unavailable**.
 
-When more than one account exists, unavailable accounts are shown in the Account
-dropdown with a warning marker. Historical repository traffic and referrer data
-remain available for selection and display. With only one account, the Account
-dropdown remains hidden as in the single-account interface; an unavailable token
-is indicated in the page title instead.
+The Account dropdown contains one entry per known token property rather than one
+entry per GitHub login. This makes duplicate tokens for the same GitHub account
+visible independently, including the status of each token. Selecting either token
+for the same login displays the same repository set.
 
-Replacing or restoring a valid token causes the account to return to normal
+When more than one token entry exists, unavailable entries are shown in the
+Account dropdown with a warning marker. Historical repository traffic and
+referrer data remain available for selection and display. With only one token
+entry, the Account dropdown remains hidden as in the single-account interface; an
+unavailable token is indicated in the page title instead.
+
+Replacing or restoring a valid token causes that token entry to return to normal
 status on the next successful collection.

@@ -113,22 +113,13 @@ def get_accounts():
         rows = connection.execute(
             """
             SELECT
-                n.owner_login,
-                CASE
-                    WHEN EXISTS (
-                        SELECT 1
-                        FROM account_credentials AS a
-                        WHERE a.login = n.owner_login
-                          AND a.token_present = 1
-                          AND a.auth_ok = 1
-                    )
-                    THEN 1
-                    ELSE 0
-                END AS available
-            FROM repository_names AS n
-            WHERE n.valid_to IS NULL
-            GROUP BY n.owner_login
-            ORDER BY n.owner_login COLLATE NOCASE
+                token_key,
+                login,
+                token_present,
+                auth_ok
+            FROM account_credentials
+            WHERE login IS NOT NULL
+            ORDER BY token_key COLLATE NOCASE
             """
         ).fetchall()
 
@@ -332,20 +323,24 @@ INDEX_HTML = """<!doctype html>
       accountSelect.innerHTML = '';
       for (const account of accounts) {
         const option = document.createElement('option');
-        option.value = account.owner_login;
-        option.dataset.available = account.available ? '1' : '0';
-        option.textContent = account.available
-          ? account.owner_login
-          : `⚠ ${account.owner_login} (token unavailable)`;
+        const available = account.token_present && account.auth_ok;
+        option.value = account.token_key;
+        option.dataset.login = account.login;
+        option.dataset.available = available ? '1' : '0';
+        const label = `${account.login} — ${account.token_key}`;
+        option.textContent = available
+          ? label
+          : `⚠ ${label} (token unavailable)`;
         accountSelect.appendChild(option);
       }
 
       accountLabel.hidden = accounts.length <= 1;
 
       if (accounts.length > 0) {
-        if (accounts.length === 1 && !accounts[0].available) {
+        if (accounts.length === 1 &&
+            !(accounts[0].token_present && accounts[0].auth_ok)) {
           pageTitle.textContent =
-            `GitHub Traffic — ${accounts[0].owner_login} (token unavailable)`;
+            `GitHub Traffic — ${accounts[0].login} (token unavailable)`;
         }
         await loadRepositories();
       }
@@ -354,7 +349,8 @@ INDEX_HTML = """<!doctype html>
     async function loadRepositories(preserveSelection = false) {
       const selectedRepository = preserveSelection ? repositorySelect.value : null;
       const days = daysSelect.value;
-      const account = encodeURIComponent(accountSelect.value);
+      const accountOption = accountSelect.options[accountSelect.selectedIndex];
+      const account = encodeURIComponent(accountOption.dataset.login);
       const response = await fetch(`/api/repositories?days=${days}&account=${account}`);
       const allRepositories = await response.json();
       const repositories = showPrivateCheckbox.checked
