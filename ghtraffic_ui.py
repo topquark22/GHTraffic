@@ -242,6 +242,9 @@ INDEX_HTML = """<!doctype html>
       gap: 1rem;
       margin-bottom: 1.5rem;
     }
+    [hidden] {
+      display: none !important;
+    }
     label {
       display: flex;
       flex-direction: column;
