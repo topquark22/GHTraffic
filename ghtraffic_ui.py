@@ -108,7 +108,21 @@ def connect_db():
     return connection
 
 
-def get_repositories(days):
+def get_accounts():
+    with connect_db() as connection:
+        rows = connection.execute(
+            """
+            SELECT DISTINCT owner_login
+            FROM repository_names
+            WHERE valid_to IS NULL
+            ORDER BY owner_login COLLATE NOCASE
+            """
+        ).fetchall()
+
+    return [row["owner_login"] for row in rows]
+
+
+def get_repositories(days, account=None):
     with connect_db() as connection:
         rows = connection.execute(
             """
@@ -120,12 +134,13 @@ def get_repositories(days):
                 ON t.repository_id = n.repository_id
                AND t.traffic_date >= date('now', ?)
             WHERE n.valid_to IS NULL
+              AND (? IS NULL OR n.owner_login = ?)
             GROUP BY n.repository_id, n.owner_login, n.repository_name, r.is_private
             HAVING COALESCE(SUM(t.views), 0) > 0
                 OR COALESCE(SUM(t.clones), 0) > 0
             ORDER BY COALESCE(SUM(t.views), 0) DESC, n.repository_name COLLATE NOCASE
             """,
-            (f"-{days - 1} days",),
+            (f"-{days - 1} days", account, account),
         ).fetchall()
 
     return [dict(row) for row in rows]
@@ -234,6 +249,10 @@ INDEX_HTML = """<!doctype html>
 
   <div class="controls">
     <label>
+      Account
+      <select id="account"></select>
+    </label>
+    <label>
       Repository
       <select id="repository"></select>
     </label>
@@ -281,6 +300,7 @@ INDEX_HTML = """<!doctype html>
 
   <script>
     const pageTitle = document.getElementById('pageTitle');
+    const accountSelect = document.getElementById('account');
     const repositorySelect = document.getElementById('repository');
     const daysSelect = document.getElementById('days');
     const referrerTable = document.getElementById('referrerTable');
@@ -291,10 +311,28 @@ INDEX_HTML = """<!doctype html>
     let chart = null;
     let displayedTraffic = [];
 
+    async function loadAccounts() {
+      const response = await fetch('/api/accounts');
+      const accounts = await response.json();
+
+      accountSelect.innerHTML = '';
+      for (const account of accounts) {
+        const option = document.createElement('option');
+        option.value = account;
+        option.textContent = account;
+        accountSelect.appendChild(option);
+      }
+
+      if (accounts.length > 0) {
+        await loadRepositories();
+      }
+    }
+
     async function loadRepositories(preserveSelection = false) {
       const selectedRepository = preserveSelection ? repositorySelect.value : null;
       const days = daysSelect.value;
-      const response = await fetch(`/api/repositories?days=${days}`);
+      const account = encodeURIComponent(accountSelect.value);
+      const response = await fetch(`/api/repositories?days=${days}&account=${account}`);
       const allRepositories = await response.json();
       const repositories = showPrivateCheckbox.checked
         ? allRepositories
@@ -424,12 +462,13 @@ INDEX_HTML = """<!doctype html>
       URL.revokeObjectURL(url);
     }
 
+    accountSelect.addEventListener('change', () => loadRepositories());
     repositorySelect.addEventListener('change', refresh);
     daysSelect.addEventListener('change', () => loadRepositories(true));
     showPrivateCheckbox.addEventListener('change', () => loadRepositories(true));
     exportCsvButton.addEventListener('click', exportCsv);
 
-    loadRepositories();
+    loadAccounts();
   </script>
 </body>
 </html>
@@ -476,12 +515,17 @@ class RequestHandler(BaseHTTPRequestHandler):
 
             query = parse_qs(parsed.query)
 
+            if parsed.path == "/api/accounts":
+                self.send_json(get_accounts())
+                return
+
             if parsed.path == "/api/repositories":
                 days = int(query.get("days", ["14"])[0])
                 if days < 1:
                     raise ValueError("days must be at least 1")
 
-                self.send_json(get_repositories(days))
+                account = query.get("account", [None])[0]
+                self.send_json(get_repositories(days, account))
                 return
 
             if parsed.path == "/api/traffic":

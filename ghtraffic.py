@@ -90,16 +90,27 @@ def database_path():
     return Path(value).expanduser()
 
 
-def github_token():
+def github_tokens():
     properties_path = default_properties_path()
     properties = load_properties(properties_path)
+    tokens = []
+
     token = properties.get("github.token")
-    if not token:
+    if token:
+        tokens.append(token)
+
+    tokens.extend(
+        value
+        for key, value in sorted(properties.items())
+        if key.startswith("github.token.") and value
+    )
+
+    if not tokens:
         raise RuntimeError(
-            f"github.token is not set in properties file: {properties_path}"
+            f"no github.token entries are set in properties file: {properties_path}"
         )
 
-    return token
+    return tokens
 
 
 def github_api():
@@ -372,45 +383,53 @@ def update_referrers(connection, repository_id, referrers, collected_date):
         )
 
 
-def collect(connection):
-    token = github_token()
+def collect(connection, account=None):
+    accounts = []
+    for token in github_tokens():
+        user = github_get("/user", token)
+        login = user["login"]
+        if account is None or login.casefold() == account.casefold():
+            accounts.append((login, token))
 
-    user = github_get("/user", token)
-    repositories = get_repositories(token)
-    print(f"Authenticated as {user['login']}; found {len(repositories)} repositories.")
+    if account is not None and not accounts:
+        raise RuntimeError(f"no configured GitHub token authenticates as {account}")
 
     failures = 0
-    for repository in repositories:
-        full_name = repository["full_name"]
-        collected_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
-        collected_date = collected_at[:10]
+    for login, token in accounts:
+        repositories = get_repositories(token)
+        print(f"Authenticated as {login}; found {len(repositories)} repositories.")
 
-        try:
-            traffic = get_traffic(repository, token)
-            referrers = get_referrers(repository, token)
+        for repository in repositories:
+            full_name = repository["full_name"]
+            collected_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+            collected_date = collected_at[:10]
 
-            with connection:
-                update_repository(connection, repository, collected_at)
-                update_traffic(
-                    connection,
-                    repository["id"],
-                    traffic,
-                    collected_at,
+            try:
+                traffic = get_traffic(repository, token)
+                referrers = get_referrers(repository, token)
+
+                with connection:
+                    update_repository(connection, repository, collected_at)
+                    update_traffic(
+                        connection,
+                        repository["id"],
+                        traffic,
+                        collected_at,
+                    )
+                    update_referrers(
+                        connection,
+                        repository["id"],
+                        referrers,
+                        collected_date,
+                    )
+
+                print(
+                    f"Collected {full_name}: {len(traffic)} days, "
+                    f"{len(referrers)} referrers"
                 )
-                update_referrers(
-                    connection,
-                    repository["id"],
-                    referrers,
-                    collected_date,
-                )
-
-            print(
-                f"Collected {full_name}: {len(traffic)} days, "
-                f"{len(referrers)} referrers"
-            )
-        except (sqlite3.Error, RuntimeError) as error:
-            failures += 1
-            print(f"Error collecting {full_name}: {error}", file=sys.stderr)
+            except (sqlite3.Error, RuntimeError) as error:
+                failures += 1
+                print(f"Error collecting {full_name}: {error}", file=sys.stderr)
 
     if failures:
         print(
@@ -598,7 +617,14 @@ def parse_args():
     )
 
     subparsers = parser.add_subparsers(dest="command", required=True)
-    subparsers.add_parser("collect", help="collect repository traffic from GitHub")
+    collect_parser = subparsers.add_parser(
+        "collect",
+        help="collect repository traffic from GitHub",
+    )
+    collect_parser.add_argument(
+        "--account",
+        help="collect only the token authenticating as this GitHub account",
+    )
     subparsers.add_parser("referrers", help="show latest referral traffic snapshots")
 
     show_parser = subparsers.add_parser("show", help="show repository traffic")
@@ -648,7 +674,7 @@ def main():
             verify_schema(connection)
 
             if args.command == "collect":
-                return collect(connection)
+                return collect(connection, args.account)
             if args.command == "show":
                 return show(connection, args.days)
             if args.command == "export-csv":

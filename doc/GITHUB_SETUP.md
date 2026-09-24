@@ -163,3 +163,30 @@ If the token expires, is revoked, or is suspected to have been exposed:
 4. revoke the old token in GitHub.
 
 GHTraffic should always have its own token so it can be rotated or revoked without affecting unrelated GitHub tools.
+
+
+## Multiple GitHub accounts
+
+GHTraffic can collect traffic for more than one GitHub account. Keep the existing
+`github.token` entry for the first account and add additional tokens with unique
+property suffixes:
+
+```text
+github.token=github_pat_...
+github.token.work=github_pat_...
+github.token.other=github_pat_...
+```
+
+The suffix is only a local configuration key; GHTraffic determines the GitHub
+account name by authenticating each token with GitHub. The web interface presents
+the discovered account names in an **Account** dropdown.
+
+Scheduled collection uses every configured token. To collect only one configured
+account manually, use:
+
+```bash
+python ghtraffic.py collect --account topquark22
+```
+
+Each token should have the repository access and read-only Administration
+permission described above for its own account.
