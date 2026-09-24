@@ -245,6 +245,8 @@ The installer shall:
 - configure `database.path` in `ghtraffic.properties` when it is not already configured, using `github_traffic.db` as the default database filename;
 - initialize the configured SQLite database from `ddl.sql` when the database does not already exist;
 - preserve an existing database during upgrades;
+- apply unapplied versioned SQL migrations from `migrations/` to an existing database;
+- record successfully applied migrations in `schema_migrations` so they are not applied again;
 - preserve an existing `ghtraffic.properties` file and existing property values during upgrades;
 - prompt securely for a GitHub access token when no token is configured;
 - write the token to `ghtraffic.properties` without echoing it to the terminal;
@@ -254,6 +256,11 @@ The installer shall:
 - start the user interface and report its local URL when installation completes successfully.
 
 The installer shall not overwrite an existing database or silently replace existing configuration.
+
+For the 4.0.0 upgrade, the installer shall apply
+`migrations/001_account_credentials.sql` to existing 3.x databases. This
+migration shall add the `account_credentials` table used to retain per-token
+authentication status without deleting or recreating existing traffic data.
 
 Cygwin shall not be a supported environment for the Windows installer. When launched under Cygwin, the installer shall stop with instructions to rerun it from native Windows Command Prompt.
 

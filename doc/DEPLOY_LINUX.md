@@ -288,6 +288,26 @@ python3 install.py
 
 The installer replaces the application and static files, preserves the existing database and `ghtraffic.properties`, updates the systemd user units, and restarts the UI.
 
+### Upgrading to 4.0.0
+
+Version 4.0.0 changes the database schema for multi-account credential status.
+Do not update only `ghtraffic.py` and `ghtraffic_ui.py` when upgrading from a
+3.x installation. Run:
+
+```bash
+python3 install.py
+```
+
+The installer preserves `github_traffic.db`, creates the migration ledger
+`schema_migrations` if necessary, and applies
+`migrations/001_account_credentials.sql`. The migration adds the
+`account_credentials` table and its login index. Existing repositories, daily
+traffic, referrers, and repository-name history are retained unchanged.
+
+After a successful migration, `001_account_credentials.sql` is recorded in
+`schema_migrations` and will not be applied again. The installer then updates
+the systemd user units and restarts the UI normally.
+
 For a manual update, copy the current application files again:
 
 ```bash
